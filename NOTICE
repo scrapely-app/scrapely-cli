@@ -1,0 +1,7 @@
+scrapely-cli
+Copyright (c) 2025-2026 TeraShift GmbH (Scrape.ly)
+
+Portions derived from apify-cli (https://github.com/apify/apify-cli),
+Copyright Apify Technologies s.r.o., licensed under the Apache License,
+Version 2.0 (see LICENSE). Modified by TeraShift GmbH; modified files carry
+a notice at the top of the file.
