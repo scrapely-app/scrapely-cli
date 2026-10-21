@@ -5,6 +5,7 @@ import { Command } from 'commander';
 import inquirer from 'inquirer';
 import { getActorConfig } from '../config.js';
 import { getLoggedClientOrThrow } from '../client.js';
+import { stdoutSafeText, terminalJson } from '../utils/terminal.js';
 
 /**
  * runs ls - List runs
@@ -118,7 +119,7 @@ export async function runLogCommand(runId: string): Promise<void> {
         // must not be printed as "undefined".
         const hasContent = typeof log === 'string' ? log.trim().length > 0 : Boolean(log);
         if (hasContent) {
-            console.log(typeof log === 'string' ? log : JSON.stringify(log));
+            console.log(typeof log === 'string' ? stdoutSafeText(log) : terminalJson(JSON.stringify(log)));
         } else {
             console.log(chalk.gray('No log available for this run (it may have expired per the data-retention policy).'));
         }

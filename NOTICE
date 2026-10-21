@@ -5,3 +5,16 @@ Portions derived from apify-cli (https://github.com/apify/apify-cli),
 Copyright Apify Technologies s.r.o., licensed under the Apache License,
 Version 2.0 (see LICENSE). Modified by TeraShift GmbH; modified files carry
 a notice at the top of the file.
+
+Files containing portions derived from apify-cli (upstream paths in
+parentheses, relative to the apify-cli repository; compared against
+apify-cli v1.6.3 to v1.10.0):
+  src/index.ts                    (src/commands/actors/push.ts, actors/call.ts,
+                                   actors/pull.ts, src/commands/run.ts, init.ts)
+  src/commands/actors.ts          (src/commands/actors/search.ts, push.ts, ls.ts)
+  src/commands/api.ts             (src/commands/api.ts)
+  src/commands/builds.ts          (src/commands/builds/add-tag.ts, remove-tag.ts)
+  src/commands/calculateMemory.ts (src/commands/actor/calculate-memory.ts)
+  src/commands/create.ts          (src/commands/create.ts, src/lib/create-utils.ts,
+                                   src/lib/utils.ts)
+  src/commands/init.ts            (src/commands/init.ts, src/lib/utils.ts)

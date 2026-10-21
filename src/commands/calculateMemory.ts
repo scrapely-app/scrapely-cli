@@ -100,11 +100,25 @@ math.import(
     { override: true },
 );
 
-function getByPath(obj: unknown, path: string, defaultVal: unknown): unknown {
-    const value = path
-        .split('.')
-        .reduce<any>((current, key) => (current === null || current === undefined ? undefined : current[key]), obj);
-    return value ?? defaultVal;
+const FORBIDDEN_PATH_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+
+/**
+ * Resolve a dotted path using own, non-function data properties only. Inherited
+ * properties (e.g. `constructor.constructor`, which reaches `Function`) are never
+ * followed, so expressions cannot obtain executable references through this helper.
+ */
+function getByPath(obj: unknown, path: unknown, defaultVal: unknown): unknown {
+    if (typeof path !== 'string') return defaultVal;
+    let current: unknown = obj;
+    for (const key of path.split('.')) {
+        if (current === null || current === undefined) return defaultVal;
+        if (FORBIDDEN_PATH_KEYS.has(key)) return defaultVal;
+        if (typeof current !== 'object' && typeof current !== 'string') return defaultVal;
+        if (!Object.prototype.hasOwnProperty.call(Object(current), key)) return defaultVal;
+        current = (current as any)[key];
+        if (typeof current === 'function') return defaultVal;
+    }
+    return current ?? defaultVal;
 }
 
 function processTemplateVariables(expression: string): string {

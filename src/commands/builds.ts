@@ -7,6 +7,7 @@ import { Command } from 'commander';
 import inquirer from 'inquirer';
 import { getLocalConfig, getActorConfig } from '../config.js';
 import { getLoggedClientOrThrow } from '../client.js';
+import { stdoutSafeText, terminalJson } from '../utils/terminal.js';
 
 /**
  * builds add-tag - Add a tag to a build
@@ -289,7 +290,7 @@ export async function buildLogCommand(buildId: string): Promise<void> {
 
     try {
         const log = await getLoggedClientOrThrow().build(buildId).log().get();
-        console.log(typeof log === 'string' ? log : JSON.stringify(log));
+        console.log(typeof log === 'string' ? stdoutSafeText(log) : terminalJson(JSON.stringify(log)));
     } catch (err) {
         console.error(chalk.red('Error: Failed to get build log.'));
         console.error(chalk.gray(`Details: ${(err as Error).message}`));

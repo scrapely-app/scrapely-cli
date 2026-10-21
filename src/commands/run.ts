@@ -126,8 +126,10 @@ function purgeDefaultStorages(cwd: string): boolean {
     const kvDefaultDir = join(storageDir, 'key_value_stores', 'default');
     const inputPath = join(kvDefaultDir, 'INPUT.json');
     let savedInput: Buffer | null = null;
+    let savedMode = 0o600;
     if (existsSync(inputPath)) {
         savedInput = readFileSync(inputPath);
+        savedMode = statSync(inputPath).mode & 0o777;
     }
 
     for (const dir of [
@@ -140,7 +142,8 @@ function purgeDefaultStorages(cwd: string): boolean {
 
     if (savedInput) {
         mkdirSync(kvDefaultDir, { recursive: true });
-        writeFileSync(inputPath, savedInput);
+        // Keep the file's permissions: INPUT.json may hold secrets.
+        writeFileSync(inputPath, savedInput, { mode: savedMode });
     }
     return true;
 }

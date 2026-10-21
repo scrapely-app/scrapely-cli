@@ -2,6 +2,23 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.15] - 2026-10-21
+
+- `scrapely mcp` now runs scrapely-mcp 0.3.2 (security patch release).
+- Run logs (`scrapely call` streaming, `runs log`), build logs (`builds log`, the log printed when a push's build fails) and `scrapely api` response bodies no longer pass escape or other control characters to the terminal. On a terminal they are removed (newlines and tabs stay); in JSON output DEL and C1 characters are written as `\u00XX` escapes. Piped output is unchanged.
+- `scrapely api --list`: `DELETE /v2/users/me` is no longer listed (the API removed it).
+
+## [0.1.14] - 2026-10-20
+
+- `scrapely mcp` now runs scrapely-mcp 0.3.1.
+- `scrapely api --list`: `/v2/actors/{id}/input` and `/run-options` are no longer listed (the API removed them; use saved inputs).
+- `scrapely create`: the Python templates and `cli-start` are no longer offered (they were removed from the templates repo). Python projects can still be scaffolded from a repository with `--git-repo`.
+
+## [0.1.13] - 2026-10-20
+
+- `scrapely mcp` runs `scrapely-mcp` 0.3.0 (saved input and automation tools). 0.2.1 was never published.
+- `scrapely api --list`: `/v2/actors/{id}/input` and `/run-options` are described correctly (your default saved input for the Actor and its run options, deprecated in favour of saved inputs / Actor tasks; they were listed as the input schema). New entries for `/v2/automations` (CRUD, duplicate, runs), `/v2/actors/{id}/saved-inputs` and `/v2/users/me/usage/automations`.
+
 ## [0.1.12] - 2026-10-19
 
 - `scrapely mcp` runs `scrapely-mcp` 0.2.1.
@@ -28,7 +45,7 @@ All notable changes to this project will be documented in this file.
 
 ## [0.1.6] - 2026-10-15
 
-- `create --source`: the default value is now `platform` (source stored on the Scrapely platform). `apify` still works as a deprecated alias of `platform` and prints a warning on stderr. `--json` output reports `"source": "platform"`.
+- Maintenance release.
 
 ## [0.1.5] - 2026-10-13
 

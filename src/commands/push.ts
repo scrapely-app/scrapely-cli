@@ -7,6 +7,7 @@ import archiver from 'archiver';
 import inquirer from 'inquirer';
 import { getToken, getLocalConfig, getActorConfig, findActorConfig, updateActorConfig, getSecrets, getWebBaseUrl } from '../config.js';
 import { getLoggedClientOrThrow } from '../client.js';
+import { stdoutSafeText, terminalJson } from '../utils/terminal.js';
 import { ActorSourceType, type ActorVersionSourceFile, type ScrapelyClient } from 'scrapely-client';
 import { safeResolve, isValidPathWithinDir } from '../utils/pathValidation.js';
 
@@ -214,11 +215,11 @@ async function waitForBuild(client: ScrapelyClient, buildId: string, timeoutSecs
  * Print the build log (best effort) — used when a build fails so the user sees
  * the compile error without running a second command.
  */
-async function printBuildLog(client: ScrapelyClient, buildId: string): Promise<void> {
+export async function printBuildLog(client: ScrapelyClient, buildId: string): Promise<void> {
     try {
         const log = await client.build(buildId).log().get();
         console.log(chalk.gray('\nBuild log:'));
-        console.log(typeof log === 'string' ? log : JSON.stringify(log, null, 2));
+        console.log(typeof log === 'string' ? stdoutSafeText(log) : terminalJson(JSON.stringify(log, null, 2)));
     } catch {
         console.log(chalk.gray(`  (log unavailable — run \`scrapely builds log ${buildId}\`)`));
     }

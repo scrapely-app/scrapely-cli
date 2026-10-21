@@ -1,6 +1,6 @@
 {
   "name": "scrapely-cli",
-  "version": "0.1.12",
+  "version": "0.1.15",
   "description": "CLI tool for Scrapely - manage actors and runs",
   "main": "dist/index.js",
   "bin": {
@@ -33,7 +33,7 @@
   "bugs": {
     "url": "https://github.com/scrapely-app/scrapely-cli/issues"
   },
-  "homepage": "https://scrape.ly",
+  "homepage": "https://scrape.ly/docs/sdk-cli",
   "publishConfig": {
     "access": "public"
   },
@@ -62,6 +62,14 @@
   },
   "overrides": {
     "brace-expansion": "5.0.9",
-    "@inquirer/external-editor": "3.0.3"
+    "@inquirer/external-editor": "3.0.3",
+    "basic-ftp": "^6.2.3",
+    "follow-redirects": "^1.16.1"
+  },
+  "pnpm": {
+    "overrides": {
+      "basic-ftp": "^6.2.3",
+      "follow-redirects": "^1.16.1"
+    }
   }
 }

@@ -1,3 +1,6 @@
+// Portions derived from apify-cli (src/commands/init.ts, src/lib/utils.ts; Copyright Apify Technologies s.r.o., Apache-2.0).
+// Modified by TeraShift GmbH. See the LICENSE and NOTICE files.
+
 import inquirer from 'inquirer';
 import chalk from 'chalk';
 import { existsSync, writeFileSync, mkdirSync, readFileSync, readdirSync } from 'fs';

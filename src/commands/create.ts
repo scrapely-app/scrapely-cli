@@ -1,9 +1,11 @@
 #!/usr/bin/env node
+// Portions derived from apify-cli (src/commands/create.ts, src/lib/create-utils.ts, src/lib/utils.ts; Copyright Apify Technologies s.r.o., Apache-2.0).
+// Modified by TeraShift GmbH. See the LICENSE and NOTICE files.
 
 import inquirer from 'inquirer';
 import chalk from 'chalk';
 import { Command } from 'commander';
-import { existsSync, writeFileSync, mkdirSync, readFileSync, rmSync, cpSync, renameSync } from 'fs';
+import { existsSync, writeFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, cpSync, renameSync } from 'fs';
 import { join } from 'path';
 import { safeResolve, validateFilename } from '../utils/pathValidation.js';
 import { getToken, getApiBaseUrl, findActorConfig, getActorConfig, updateActorConfig, ACTOR_CONFIG_FILES } from '../config.js';
@@ -65,35 +67,6 @@ export const ACTOR_TEMPLATES = [
         useCases: ['web-scraper', 'browser-automation'],
         folder: 'ts-crawlee-playwright-chrome',
         repoUrl: 'https://github.com/scrapely-app/actor-templates/tree/main/ts-crawlee-playwright-chrome',
-    },
-    {
-        name: 'crawlee-playwright-py',
-        aliases: [] as string[],
-        displayName: 'Crawlee Playwright Python',
-        description: 'Web scraper using Playwright browser automation with Python',
-        language: 'python',
-        useCases: ['web-scraper', 'browser-automation'],
-        folder: 'python-crawlee-playwright',
-        repoUrl: 'https://github.com/scrapely-app/actor-templates/tree/main/python-crawlee-playwright',
-    },
-    {
-        name: 'crawlee-bs4-py',
-        aliases: [] as string[],
-        displayName: 'Crawlee BeautifulSoup Python',
-        description: 'Web scraper using BeautifulSoup for HTML parsing with Python',
-        language: 'python',
-        useCases: ['web-scraper', 'data-pipeline'],
-        folder: 'python-crawlee-beautifulsoup',
-        repoUrl: 'https://github.com/scrapely-app/actor-templates/tree/main/python-crawlee-beautifulsoup',
-    },    {
-        name: 'cli-start',
-        aliases: [] as string[],
-        displayName: 'CLI Actor wrapper',
-        description: 'An Actor for existing command-line tools. No rewrite needed.',
-        language: 'javascript',
-        useCases: ['data-pipeline'],
-        folder: 'cli-start',
-        repoUrl: 'https://github.com/scrapely-app/actor-templates/tree/main/cli-start',
     },
     {
         name: 'js-bootstrap-cheerio-crawler',
@@ -174,186 +147,6 @@ export const ACTOR_TEMPLATES = [
         useCases: ['web-scraper'],
         folder: 'js-start',
         repoUrl: 'https://github.com/scrapely-app/actor-templates/tree/main/js-start',
-    },
-    {
-        name: 'python-beautifulsoup',
-        aliases: [] as string[],
-        displayName: 'Python site crawler (BeautifulSoup)',
-        description: 'A lightweight crawler that follows links and gets data from static pages with BeautifulSoup. Good for blogs, news, or product listings, but it can\'t run client-side JavaScript.',
-        language: 'python',
-        useCases: ['web-scraper'],
-        folder: 'python-beautifulsoup',
-        repoUrl: 'https://github.com/scrapely-app/actor-templates/tree/main/python-beautifulsoup',
-    },
-    {
-        name: 'python-browseruse',
-        aliases: [] as string[],
-        displayName: 'Browser Use scraping agent',
-        description: 'An AI agent that browses a website like a person and returns structured data. Good for sites that change often or are hard to scrape with selectors.',
-        language: 'python',
-        useCases: ['ai-agent', 'web-scraper'],
-        folder: 'python-browseruse',
-        repoUrl: 'https://github.com/scrapely-app/actor-templates/tree/main/python-browseruse',
-    },
-    {
-        name: 'python-crawlee-parsel',
-        aliases: ['getting_started_crawlee_parsel'],
-        displayName: 'Python site crawler (Crawlee + Parsel)',
-        description: 'A crawler that follows links and gets data from static pages, with Crawlee handling retries and request queues. Uses Parsel, with native XPath and CSS selectors. Can\'t run client-side JavaScript.',
-        language: 'python',
-        useCases: ['web-scraper'],
-        folder: 'python-crawlee-parsel',
-        repoUrl: 'https://github.com/scrapely-app/actor-templates/tree/main/python-crawlee-parsel',
-    },
-    {
-        name: 'python-crawlee-playwright-camoufox',
-        aliases: ['getting_started_crawlee_playwright_camoufox'],
-        displayName: 'Python stealth crawler (Crawlee + Playwright + Camoufox)',
-        description: 'A browser crawler built to get past bot protection. Uses Camoufox, a Firefox build that looks like a real user.',
-        language: 'python',
-        useCases: ['web-scraper'],
-        folder: 'python-crawlee-playwright-camoufox',
-        repoUrl: 'https://github.com/scrapely-app/actor-templates/tree/main/python-crawlee-playwright-camoufox',
-    },
-    {
-        name: 'python-crewai',
-        aliases: [] as string[],
-        displayName: 'Python social media agent (CrewAI)',
-        description: 'A team of AI agents that research and analyze social media.',
-        language: 'python',
-        useCases: ['ai-agent'],
-        folder: 'python-crewai',
-        repoUrl: 'https://github.com/scrapely-app/actor-templates/tree/main/python-crewai',
-    },
-    {
-        name: 'python-empty',
-        aliases: [] as string[],
-        displayName: 'Empty Python Actor',
-        description: 'An Actor with the Scrapely SDK set up, so you can build any tool you need.',
-        language: 'python',
-        useCases: [] as string[],
-        folder: 'python-empty',
-        repoUrl: 'https://github.com/scrapely-app/actor-templates/tree/main/python-empty',
-    },
-    {
-        name: 'python-langgraph',
-        aliases: [] as string[],
-        displayName: 'Python social media agent (LangGraph)',
-        description: 'An AI agent for social media research, built on graph-based, multi-step workflows.',
-        language: 'python',
-        useCases: ['ai-agent'],
-        folder: 'python-langgraph',
-        repoUrl: 'https://github.com/scrapely-app/actor-templates/tree/main/python-langgraph',
-    },
-    {
-        name: 'python-llamaindex-agent',
-        aliases: [] as string[],
-        displayName: 'Python contact finder agent (LlamaIndex)',
-        description: 'An AI agent that finds and summarizes contact details from a website.',
-        language: 'python',
-        useCases: ['ai-agent'],
-        folder: 'python-llamaindex-agent',
-        repoUrl: 'https://github.com/scrapely-app/actor-templates/tree/main/python-llamaindex-agent',
-    },
-    {
-        name: 'python-mcp-empty',
-        aliases: [] as string[],
-        displayName: 'Python MCP server',
-        description: 'An MCP server that gives AI assistants like Claude and Cursor your own tools, with built-in pay-per-event billing.',
-        language: 'python',
-        useCases: ['ai-agent', 'data-pipeline'],
-        folder: 'python-mcp-empty',
-        repoUrl: 'https://github.com/scrapely-app/actor-templates/tree/main/python-mcp-empty',
-    },
-    {
-        name: 'python-mcp-proxy',
-        aliases: [] as string[],
-        displayName: 'Python MCP proxy',
-        description: 'A proxy that turns any existing MCP server into a monetized Actor. Supports stdio, HTTP, and SSE.',
-        language: 'python',
-        useCases: ['ai-agent', 'data-pipeline'],
-        folder: 'python-mcp-proxy',
-        repoUrl: 'https://github.com/scrapely-app/actor-templates/tree/main/python-mcp-proxy',
-    },
-    {
-        name: 'python-playwright',
-        aliases: [] as string[],
-        displayName: 'Python browser crawler (Playwright)',
-        description: 'A crawler that uses a real browser through Playwright, so it gets data HTTP crawlers miss. Good for social feeds, dashboards, or single-page apps.',
-        language: 'python',
-        useCases: ['web-scraper', 'browser-automation'],
-        folder: 'python-playwright',
-        repoUrl: 'https://github.com/scrapely-app/actor-templates/tree/main/python-playwright',
-    },
-    {
-        name: 'python-pydanticai',
-        aliases: [] as string[],
-        displayName: 'Python joke agent (PydanticAI)',
-        description: 'An AI agent that tells jokes, built with PydanticAI. A starting point for any AI agent.',
-        language: 'python',
-        useCases: ['ai-agent'],
-        folder: 'python-pydanticai',
-        repoUrl: 'https://github.com/scrapely-app/actor-templates/tree/main/python-pydanticai',
-    },
-    {
-        name: 'python-scrapy',
-        aliases: [] as string[],
-        displayName: 'Python site crawler (Scrapy)',
-        description: 'A crawler for large sites, built on the Scrapy framework. Can\'t run client-side JavaScript.',
-        language: 'python',
-        useCases: ['web-scraper'],
-        folder: 'python-scrapy',
-        repoUrl: 'https://github.com/scrapely-app/actor-templates/tree/main/python-scrapy',
-    },
-    {
-        name: 'python-selenium',
-        aliases: [] as string[],
-        displayName: 'Python browser crawler (Selenium)',
-        description: 'A crawler that renders JavaScript in Chrome through Selenium before getting data. Good for social feeds, dashboards, or single-page apps.',
-        language: 'python',
-        useCases: ['web-scraper', 'browser-automation'],
-        folder: 'python-selenium',
-        repoUrl: 'https://github.com/scrapely-app/actor-templates/tree/main/python-selenium',
-    },
-    {
-        name: 'python-smolagents',
-        aliases: [] as string[],
-        displayName: 'Python news agent (Smolagents)',
-        description: 'An AI agent that finds and summarizes news on topics you choose.',
-        language: 'python',
-        useCases: ['ai-agent'],
-        folder: 'python-smolagents',
-        repoUrl: 'https://github.com/scrapely-app/actor-templates/tree/main/python-smolagents',
-    },
-    {
-        name: 'python-standby',
-        aliases: [] as string[],
-        displayName: 'Python API Actor',
-        description: 'An Actor that stays running, ready to respond to HTTP requests. Good for APIs and real-time services.',
-        language: 'python',
-        useCases: ['data-pipeline'],
-        folder: 'python-standby',
-        repoUrl: 'https://github.com/scrapely-app/actor-templates/tree/main/python-standby',
-    },
-    {
-        name: 'python-start',
-        aliases: ['getting_started_python'],
-        displayName: 'Python one-page scraper (BeautifulSoup)',
-        description: 'A scraper that gets data from one web page with BeautifulSoup. The simplest way to start scraping.',
-        language: 'python',
-        useCases: ['web-scraper'],
-        folder: 'python-start',
-        repoUrl: 'https://github.com/scrapely-app/actor-templates/tree/main/python-start',
-    },
-    {
-        name: 'python-uv',
-        aliases: [] as string[],
-        displayName: 'Empty Python Actor (uv)',
-        description: 'An Actor with the Scrapely SDK set up and dependencies managed by the uv package manager, so you can build any tool you need.',
-        language: 'python',
-        useCases: [] as string[],
-        folder: 'python-uv',
-        repoUrl: 'https://github.com/scrapely-app/actor-templates/tree/main/python-uv',
     },
     {
         name: 'ts-beeai-agent',
@@ -669,8 +462,10 @@ type TemplateDownloadSource =
     | { kind: 'repo'; url: string };
 
 async function downloadTemplateFromGitHub(source: TemplateDownloadSource, targetDir: string): Promise<void> {
-    // Create a temporary directory for cloning
-    const tempDir = join(tmpdir(), `scrapely-template-${Date.now()}`);
+    // Clone into a fresh private directory (mkdtemp: unpredictable name, mode
+    // 0700), never a guessable path another local user could create first.
+    const tempRoot = mkdtempSync(join(tmpdir(), 'scrapely-template-'));
+    const tempDir = join(tempRoot, 'repo');
 
     try {
         // SECURITY: execFile with an argument array — the repo URLs are
@@ -702,7 +497,7 @@ async function downloadTemplateFromGitHub(source: TemplateDownloadSource, target
     } finally {
         // Clean up temp directory
         try {
-            rmSync(tempDir, { recursive: true, force: true });
+            rmSync(tempRoot, { recursive: true, force: true });
         } catch {
             // Ignore cleanup errors
         }
@@ -1447,8 +1242,8 @@ export function setupCreateCommand(program: Command): void {
     program
         .command('create [actorName]')
         .description('Create an actor project from a template in a new directory. Interactive: prompts for the actor name, use case, language and template when not provided; pass --template (or --use-case/--language) and the name to run non-interactively')
-        .option('-t, --template <template>', 'Template for the actor (e.g., crawlee-cheerio-js, crawlee-playwright, crawlee-puppeteer-chrome, crawlee-playwright-ts, crawlee-playwright-py, crawlee-bs4-py; legacy aliases such as crawlee-playwright-js still resolve)')
-        .option('-l, --language <language>', 'Filter templates by language (javascript|js, typescript|ts, python|py)')
+        .option('-t, --template <template>', 'Template for the actor (e.g., crawlee-cheerio-js, crawlee-playwright, crawlee-puppeteer-chrome, crawlee-playwright-ts; legacy aliases such as crawlee-playwright-js still resolve)')
+        .option('-l, --language <language>', 'Filter templates by language (javascript|js, typescript|ts)')
         .option('-u, --use-case <useCase>', 'Filter templates by use case (web-scraper, ai-agent, browser-automation, data-pipeline). Ignored when --template is provided.')
         .option('--json', 'Print the created actor details as JSON')
         .option('--source <source>', 'Where the actor source code will live: "platform" (default, stored on the Scrapely platform) or "github" (kept in a GitHub repository created from the template). "apify" is a deprecated alias of "platform". "gitlab" and "bitbucket" are accepted for CLI compatibility but are not supported on Scrapely yet')

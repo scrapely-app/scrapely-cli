@@ -1,8 +1,17 @@
 #!/usr/bin/env node
 
 import chalk from 'chalk';
-import { existsSync, readFileSync } from 'fs';
-import { join } from 'path';
+import {
+    closeSync,
+    constants,
+    existsSync,
+    fstatSync,
+    lstatSync,
+    openSync,
+    readFileSync,
+    realpathSync,
+} from 'fs';
+import { isAbsolute, join, relative } from 'path';
 
 export interface RemoteInputOptions {
     input?: string;
@@ -59,11 +68,75 @@ export async function resolveRemoteInput(options: RemoteInputOptions, quiet = fa
     } else {
         // fall back to the default local key-value store INPUT.json.
         const localInputPath = join(process.cwd(), 'storage', 'key_value_stores', 'default', 'INPUT.json');
-        if (existsSync(localInputPath)) {
+        // The implicit path is project-controlled, so it must be a regular file located
+        // inside the project directory (no symlinks) to avoid reading arbitrary local files.
+        let stat: ReturnType<typeof lstatSync> | undefined;
+        try {
+            stat = lstatSync(localInputPath);
+        } catch {
+            stat = undefined;
+        }
+        if (stat) {
+            const refuse = (): never => {
+                console.error(
+                    chalk.red(
+                        'Error: storage/key_value_stores/default/INPUT.json must be a regular file inside the project ' +
+                            '(symbolic links are not followed). Use --input-file to supply an input from another location.',
+                    ),
+                );
+                process.exit(1);
+            };
+            if (stat.isSymbolicLink() || !stat.isFile()) {
+                refuse();
+                return undefined; // refuse() calls process.exit(1), but in tests it may return
+            }
+
+            // Reject symlinked parent directories that resolve outside the project.
+            try {
+                const projectRoot = realpathSync(process.cwd());
+                const resolved = realpathSync(localInputPath);
+                const rel = relative(projectRoot, resolved);
+                // Reject if the path escapes the project directory:
+                // - starts with '..' (parent directory traversal)
+                // - is absolute (completely outside)
+                // - is empty string (would be the project root itself, not a file inside it)
+                if (rel === '' || rel.startsWith('..') || isAbsolute(rel)) {
+                    refuse();
+                    return undefined; // refuse() calls process.exit(1), but in tests it may return
+                }
+            } catch (err: any) {
+                // realpathSync can fail if there are permission issues or broken symlinks
+                refuse();
+                return undefined; // refuse() calls process.exit(1), but in tests it may return
+            }
+
             if (!quiet) {
                 console.log(chalk.gray('Using input from storage/key_value_stores/default/INPUT.json.'));
             }
-            raw = readFileSync(localInputPath, 'utf-8');
+            // O_NOFOLLOW closes the race between the check above and the read.
+            try {
+                const fd = openSync(localInputPath, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
+                try {
+                    if (!fstatSync(fd).isFile()) {
+                        refuse();
+                        return undefined; // refuse() calls process.exit(1), but in tests it may return
+                    }
+                    raw = readFileSync(fd, 'utf-8');
+                } finally {
+                    closeSync(fd);
+                }
+            } catch (err: any) {
+                // ELOOP means a symlink was encountered (O_NOFOLLOW behavior)
+                // EISDIR means the path is a directory, not a file
+                if (err.code === 'ELOOP' || err.code === 'EISDIR') {
+                    refuse();
+                    // refuse() calls process.exit(1), which never returns in production.
+                    // In tests where process.exit is mocked, we return here to prevent
+                    // the error from propagating.
+                    return undefined;
+                }
+                throw err;
+            }
         }
     }
 

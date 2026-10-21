@@ -11,6 +11,7 @@ import { pullCommand } from './pull.js';
 import { pushCommand } from './push.js';
 import { buildCreateCommand } from './builds.js';
 import { resolveRemoteInput } from '../utils/inputResolution.js';
+import { terminalSafeLine as line, terminalSafeText, stdoutSafeText } from '../utils/terminal.js';
 
 /**
  * actors ls - List actors
@@ -35,7 +36,7 @@ export async function listActorsCommand(options?: { my?: boolean; limit?: number
             console.log(chalk.bold('Actors:'));
             for (const actor of result.items as Array<{ name: string; username: string; title?: string; isPublic?: boolean }>) {
                 const visibility = actor.isPublic ? chalk.green('public') : chalk.yellow('private');
-                console.log(`  ${chalk.cyan(`${actor.username}/${actor.name}`)} ${chalk.gray(actor.title || '')} [${visibility}]`);
+                console.log(`  ${chalk.cyan(line(`${actor.username}/${actor.name}`))} ${chalk.gray(line(actor.title || ''))} [${visibility}]`);
             }
         } else {
             console.log(chalk.gray('No actors found.'));
@@ -85,9 +86,10 @@ export async function actorsSearchCommand(query?: string, options?: { category?:
         for (const item of result.items) {
             const pricingModel = (item as { currentPricingInfo?: { pricingModel?: string } }).currentPricingInfo?.pricingModel;
             const stats = (item as { stats?: { totalUsers30Days?: number } }).stats;
-            console.log(`  ${chalk.cyan(item.title ?? `${item.username}/${item.name}`)} ${chalk.gray(`${item.username}/${item.name}`)}`);
+            console.log(`  ${chalk.cyan(line(item.title ?? `${item.username}/${item.name}`))} ${chalk.gray(line(`${item.username}/${item.name}`))}`);
             if (item.description) {
-                const desc = item.description.length > 100 ? `${item.description.substring(0, 100)}...` : item.description;
+                const safe = line(item.description);
+                const desc = safe.length > 100 ? `${safe.substring(0, 100)}...` : safe;
                 console.log(chalk.gray(`    ${desc}`));
             }
             console.log(chalk.gray(`    Users (30d): ${stats?.totalUsers30Days ?? 0} | Pricing: ${pricingModelLabels[pricingModel ?? ''] ?? pricingModel ?? 'Unknown'}`));
@@ -174,7 +176,7 @@ export async function actorInfoCommand(actorId: string, options?: { input?: bool
         if (options?.readme) {
             const readme = definition?.readme;
             if (typeof readme === 'string' && readme.length > 0) {
-                console.log(readme);
+                console.log(terminalSafeText(readme));
             } else {
                 console.log(chalk.gray('No README found for this actor.'));
             }
@@ -188,9 +190,9 @@ export async function actorInfoCommand(actorId: string, options?: { input?: bool
 
         console.log(chalk.bold('Actor Info:'));
         console.log(`  ID: ${chalk.cyan(actor.id)}`);
-        console.log(`  Name: ${actor.username}/${actor.name}`);
-        if (actor.title) console.log(`  Title: ${actor.title}`);
-        if (actor.description) console.log(`  Description: ${actor.description}`);
+        console.log(`  Name: ${line(`${actor.username}/${actor.name}`)}`);
+        if (actor.title) console.log(`  Title: ${line(actor.title)}`);
+        if (actor.description) console.log(`  Description: ${line(actor.description)}`);
         console.log(`  Visibility: ${actor.isPublic ? chalk.green('public') : chalk.yellow('private')}`);
         if (actor.versions && actor.versions.length > 0) {
             console.log(`  Versions: ${actor.versions.map(v => v.versionNumber).join(', ')}`);
@@ -211,12 +213,12 @@ export async function actorInfoCommand(actorId: string, options?: { input?: bool
 const TERMINAL_RUN_STATUSES = new Set(['SUCCEEDED', 'FAILED', 'ABORTED', 'TIMED-OUT', 'ZOMBIE']);
 
 /** Stream newly appended run-log bytes to stdout (best-effort); returns the new offset. */
-async function streamNewLogBytes(runId: string, offset: number): Promise<number> {
+export async function streamNewLogBytes(runId: string, offset: number): Promise<number> {
     try {
         const log = await getLoggedClientOrThrow().run(runId).log().get();
         const logText = typeof log === 'string' ? log : '';
         if (logText.length > offset) {
-            process.stdout.write(logText.slice(offset));
+            process.stdout.write(stdoutSafeText(logText.slice(offset)));
             return logText.length;
         }
         // Log was rotated/truncated — resync to its current length.

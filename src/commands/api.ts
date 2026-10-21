@@ -1,9 +1,12 @@
 #!/usr/bin/env node
+// Portions derived from apify-cli (src/commands/api.ts; Copyright Apify Technologies s.r.o., Apache-2.0).
+// Modified by TeraShift GmbH. See the LICENSE and NOTICE files.
 
 import chalk from 'chalk';
 import { Command } from 'commander';
 import { getApiBaseUrl } from '../config.js';
 import { getLoggedClientOrThrow } from '../client.js';
+import { stdoutSafeText, terminalJson } from '../utils/terminal.js';
 
 /**
  * API endpoint definitions for help — derived from scrapely-server route files.
@@ -16,7 +19,7 @@ interface ApiEndpoint {
     category: string;
 }
 
-const API_ENDPOINTS: ApiEndpoint[] = [
+export const API_ENDPOINTS: ApiEndpoint[] = [
     // ── Actors ──
     { method: 'GET', path: '/v2/actors', category: 'Actors', summary: 'List actors' },
     { method: 'POST', path: '/v2/actors', category: 'Actors', summary: 'Create actor' },
@@ -24,10 +27,7 @@ const API_ENDPOINTS: ApiEndpoint[] = [
     { method: 'GET', path: '/v2/acts/{actorId}', category: 'Actors', summary: 'Get actor (alias)' },
     { method: 'PUT', path: '/v2/actors/{actorId}', category: 'Actors', summary: 'Update actor' },
     { method: 'DELETE', path: '/v2/actors/{actorId}', category: 'Actors', summary: 'Delete actor' },
-    { method: 'GET', path: '/v2/actors/{actorId}/input', category: 'Actors', summary: 'Get actor input schema' },
-    { method: 'PUT', path: '/v2/actors/{actorId}/input', category: 'Actors', summary: 'Update actor input schema' },
-    { method: 'GET', path: '/v2/actors/{actorId}/run-options', category: 'Actors', summary: 'Get actor run options' },
-    { method: 'PUT', path: '/v2/actors/{actorId}/run-options', category: 'Actors', summary: 'Update actor run options' },
+    { method: 'GET', path: '/v2/actors/{actorId}/saved-inputs', category: 'Actors', summary: 'List your saved inputs and example inputs for an actor' },
     { method: 'POST', path: '/v2/actors/{actorId}/bookmark', category: 'Actors', summary: 'Bookmark actor' },
     { method: 'DELETE', path: '/v2/actors/{actorId}/bookmark', category: 'Actors', summary: 'Remove bookmark' },
     { method: 'GET', path: '/v2/actors/{actorId}/bookmark', category: 'Actors', summary: 'Check bookmark' },
@@ -134,6 +134,18 @@ const API_ENDPOINTS: ApiEndpoint[] = [
     { method: 'DELETE', path: '/v2/schedules/{scheduleId}', category: 'Schedules', summary: 'Delete schedule' },
     { method: 'GET', path: '/v2/schedules/{scheduleId}/log', category: 'Schedules', summary: 'Get schedule log' },
 
+    // ── Automations ──
+    { method: 'GET', path: '/v2/automations', category: 'Automations', summary: 'List automations (filters: actorId, savedInputId, search)' },
+    { method: 'POST', path: '/v2/automations', category: 'Automations', summary: 'Create automation' },
+    { method: 'GET', path: '/v2/automations/{automationId}', category: 'Automations', summary: 'Get automation details' },
+    { method: 'PUT', path: '/v2/automations/{automationId}', category: 'Automations', summary: 'Update automation (partial)' },
+    { method: 'DELETE', path: '/v2/automations/{automationId}', category: 'Automations', summary: 'Delete automation' },
+    { method: 'POST', path: '/v2/automations/{automationId}/duplicate', category: 'Automations', summary: 'Duplicate automation (copy starts paused)' },
+    { method: 'POST', path: '/v2/automations/{automationId}/runs', category: 'Automations', summary: 'Run automation now' },
+    { method: 'GET', path: '/v2/automations/{automationId}/runs', category: 'Automations', summary: 'List automation runs' },
+    { method: 'GET', path: '/v2/automations/{automationId}/runs/{runId}', category: 'Automations', summary: 'Get automation run details' },
+    { method: 'GET', path: '/v2/users/me/usage/automations', category: 'Automations', summary: 'AI step costs per automation run (month)' },
+
     // ── Webhooks ──
     { method: 'GET', path: '/v2/webhooks', category: 'Webhooks', summary: 'List webhooks' },
     { method: 'POST', path: '/v2/webhooks', category: 'Webhooks', summary: 'Create webhook' },
@@ -149,7 +161,6 @@ const API_ENDPOINTS: ApiEndpoint[] = [
 
     // ── Users ──
     { method: 'GET', path: '/v2/users/me', category: 'Users', summary: 'Get current user' },
-    { method: 'DELETE', path: '/v2/users/me', category: 'Users', summary: 'Delete current user' },
     { method: 'GET', path: '/v2/users/me/stats', category: 'Users', summary: 'Get user stats' },
     { method: 'GET', path: '/v2/users/me/limits', category: 'Users', summary: 'Get user limits' },
     { method: 'GET', path: '/v2/users/me/plan', category: 'Users', summary: 'Get user plan' },
@@ -457,16 +468,18 @@ export async function apiCommand(
             ...(body !== undefined ? { data: body } : {}),
         });
 
-        // Pretty-print JSON responses, print everything else as-is
+        // Pretty-print JSON responses, print everything else as-is (made terminal-safe on a TTY)
         const data = response.data;
         if (typeof data === 'string') {
+            let pretty: string | undefined;
             try {
-                console.log(JSON.stringify(JSON.parse(data), null, 2));
+                pretty = JSON.stringify(JSON.parse(data), null, 2);
             } catch {
-                console.log(data);
+                pretty = undefined;
             }
+            console.log(pretty !== undefined ? terminalJson(pretty) : stdoutSafeText(data));
         } else if (data !== undefined && data !== '') {
-            console.log(JSON.stringify(data, null, 2));
+            console.log(terminalJson(JSON.stringify(data, null, 2)));
         }
     } catch (err) {
         // ApifyApiError: the API responded with an error body — print it like
@@ -475,11 +488,11 @@ export async function apiCommand(
         if (apiError.statusCode) {
             const data = apiError.data;
             if (data !== undefined && data !== '') {
-                console.log(typeof data === 'string' ? data : JSON.stringify(data, null, 2));
+                console.log(typeof data === 'string' ? stdoutSafeText(data) : terminalJson(JSON.stringify(data, null, 2)));
             } else if (apiError.message) {
                 // Scrapely's API puts the error text in { error: { message } },
                 // which the client surfaces as the error message.
-                console.log(apiError.message);
+                console.log(stdoutSafeText(apiError.message));
             } else {
                 console.error(chalk.red(`Error: API responded with status ${apiError.statusCode}.`));
             }

@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+// Portions derived from apify-cli (src/commands/actors/push.ts, actors/call.ts, actors/pull.ts, src/commands/run.ts, init.ts; Copyright Apify Technologies s.r.o., Apache-2.0).
+// Modified by TeraShift GmbH. See the LICENSE and NOTICE files.
 
 import { Command } from 'commander';
 import { loginCommand } from './commands/login.js';
