@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.16] - 2026-10-22
+
+- `scrapely login` (browser): the page the browser lands on after sign-in matches the Scrape.ly console (light or dark with the system, works offline). Cancelling on the consent screen now reads "Sign-in cancelled" instead of "Login failed: access_denied"; other errors read "Sign-in failed" with the reason.
+
 ## [0.1.15] - 2026-10-21
 
 - `scrapely mcp` now runs scrapely-mcp 0.3.2 (security patch release).
