@@ -8,24 +8,30 @@ import { getApiBaseUrl, getToken } from './config.js';
  *
  * The client appends `/v2` itself, so the bare API base URL is passed.
  */
-export function getClient(token?: string): ScrapelyClient {
+export interface ClientTuning {
+    /** Retries for 429, 5xx and network errors (client default: 8, about 2-4 minutes in all). */
+    maxRetries?: number;
+}
+
+export function getClient(token?: string, tuning: ClientTuning = {}): ScrapelyClient {
     const resolvedToken = token ?? getToken();
     return new ScrapelyClient({
         baseUrl: getApiBaseUrl().replace(/\/+$/, ''),
         ...(resolvedToken ? { token: resolvedToken } : {}),
+        ...(tuning.maxRetries !== undefined ? { maxRetries: tuning.maxRetries } : {}),
     });
 }
 
 /**
  * Build a ScrapelyClient or exit with an error when no token is available.
  */
-export function getLoggedClientOrThrow(): ScrapelyClient {
+export function getLoggedClientOrThrow(tuning: ClientTuning = {}): ScrapelyClient {
     const token = getToken();
     if (!token) {
         console.error('You are not logged in. Call "scrapely login" first.');
         process.exit(1);
     }
-    return getClient(token);
+    return getClient(token, tuning);
 }
 
 /**
@@ -51,9 +57,14 @@ export function getRuntimeClient(): ScrapelyClient {
         process.env.SCRAPELY_TOKEN;
 
     const token = runtimeToken ?? (runtimeBaseUrl ? undefined : getToken() ?? undefined);
+    const baseUrl = (runtimeBaseUrl ?? getApiBaseUrl()).replace(/\/+$/, '');
 
     return new ScrapelyClient({
-        baseUrl: (runtimeBaseUrl ?? getApiBaseUrl()).replace(/\/+$/, ''),
+        baseUrl,
+        // Host for links (signed public record URLs). Inside a run the API base
+        // is the internal address; the platform sets the public one separately.
+        // Without this the client would use its built-in production host.
+        publicBaseUrl: (process.env.APIFY_API_PUBLIC_BASE_URL || baseUrl).replace(/\/+$/, ''),
         ...(token ? { token } : {}),
     });
 }

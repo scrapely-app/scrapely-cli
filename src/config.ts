@@ -334,11 +334,19 @@ export function getApiBaseUrl(): string {
 }
 
 /**
- * Base URL of the web dashboard (human-facing landing pages), used when
- * printing links in CLI output. Resolution order:
+ * Base URL of the web dashboard (console), used for links the CLI prints or
+ * opens. Resolution order:
  *   1. SCRAPELY_WEB_URL env var
- *   2. API base URL with the leading "api." subdomain stripped (api.example.com → example.com)
- *   3. API base URL as-is (self-hosted setups where API and web share a host)
+ *   2. Derived from the API host: the console sits next to the API under a
+ *      `my` name, the same way Scrape.ly's own hosts are laid out:
+ *        api.scrape.ly          → my.scrape.ly
+ *        api-staging.scrape.ly  → my-staging.scrape.ly
+ *        api.example.com        → my.example.com
+ *        api-eu.example.com     → my-eu.example.com
+ *      Scheme and port are kept.
+ *   3. The API base URL itself for any other host (localhost, IPs, a host
+ *      without an `api` label): self-hosted setups where the API and the
+ *      console share a host. Set SCRAPELY_WEB_URL when they don't.
  */
 export function getWebBaseUrl(): string {
     const fromEnv = process.env.SCRAPELY_WEB_URL;
@@ -346,17 +354,13 @@ export function getWebBaseUrl(): string {
     const apiBase = getApiBaseUrl();
     try {
         const url = new URL(apiBase);
-        // The console (dashboard) never lives on the API host:
-        //   api.example.com       → example.com
-        //   api-staging.scrape.ly → my-staging.scrape.ly
-        // localhost and unknown hosts are returned unchanged.
-        const stripped = url.hostname.replace(/^api\./, '');
-        const remapped = stripped.replace(/^api-/, 'my-');
-        if (remapped !== url.hostname) {
-            return `${url.protocol}//${remapped}`;
+        const match = /^api(-[a-z0-9-]+)?\.(.+)$/i.exec(url.hostname);
+        if (match) {
+            const host = `my${match[1] ?? ''}.${match[2]}`;
+            return `${url.protocol}//${host}${url.port ? `:${url.port}` : ''}`;
         }
     } catch {
-        // fall through to API base
+        // not a URL: fall through to the API base
     }
     return apiBase.replace(/\/+$/, '');
 }

@@ -407,7 +407,9 @@ export async function buildCreateCommand(options?: { actorId?: string; version?:
                 status = (await buildWaitCommand(build.id, { pollInterval: 2, quiet: true })) ?? status;
             }
             console.log(JSON.stringify({ data: { ...build, status } }, null, 2));
-            if (status !== 'SUCCEEDED') process.exit(1);
+            // Without --wait the build was only queued: creating it succeeded.
+            // With --wait the exit code reflects the build outcome.
+            if (options?.wait && status !== 'SUCCEEDED') process.exit(1);
             return;
         }
 

@@ -39,8 +39,8 @@ export const API_ENDPOINTS: ApiEndpoint[] = [
     { method: 'GET', path: '/v2/actor-builds/{buildId}/log', category: 'Builds', summary: 'Get build log' },
     { method: 'POST', path: '/v2/actors/{actorId}/builds', category: 'Builds', summary: 'Create build for actor' },
     { method: 'GET', path: '/v2/actors/{actorId}/builds', category: 'Builds', summary: 'List builds for actor' },
-    { method: 'GET', path: '/v2/actors/{actorId}/builds/{buildId}', category: 'Builds', summary: 'Get specific build' },
-    { method: 'GET', path: '/v2/actors/{actorId}/builds/{buildId}/log', category: 'Builds', summary: 'Get build log (by actor)' },
+    { method: 'GET', path: '/v2/actors/{actorId}/builds/default', category: 'Builds', summary: 'Get the default build for actor' },
+    { method: 'POST', path: '/v2/actor-builds/{buildId}/abort', category: 'Builds', summary: 'Abort build' },
     // NOTE: no build-scoped tag endpoints here — tags are managed through
     // `PUT /v2/actors/{actorId}` (`taggedBuilds` field), matching the platform API.
     { method: 'DELETE', path: '/v2/actor-builds/{buildId}', category: 'Builds', summary: 'Delete build' },
@@ -51,7 +51,7 @@ export const API_ENDPOINTS: ApiEndpoint[] = [
     { method: 'GET', path: '/v2/actor-runs/{runId}/input', category: 'Runs', summary: 'Get run input' },
     { method: 'POST', path: '/v2/actor-runs/{runId}/abort', category: 'Runs', summary: 'Abort run' },
     { method: 'POST', path: '/v2/actor-runs/{runId}/resurrect', category: 'Runs', summary: 'Resurrect run' },
-    { method: 'PUT', path: '/v2/actor-runs/{runId}', category: 'Runs', summary: 'Update run (metamorph)' },
+    { method: 'PUT', path: '/v2/actor-runs/{runId}', category: 'Runs', summary: 'Update run (status message, general access)' },
     { method: 'DELETE', path: '/v2/actor-runs/{runId}', category: 'Runs', summary: 'Delete run' },
     { method: 'GET', path: '/v2/actor-runs/{runId}/log', category: 'Runs', summary: 'Get run log' },
     { method: 'POST', path: '/v2/actor-runs/{runId}/metamorph', category: 'Runs', summary: 'Metamorph run' },
@@ -121,10 +121,10 @@ export const API_ENDPOINTS: ApiEndpoint[] = [
     { method: 'GET', path: '/v2/actor-tasks/{taskId}', category: 'Tasks', summary: 'Get task details' },
     { method: 'PUT', path: '/v2/actor-tasks/{taskId}', category: 'Tasks', summary: 'Update task' },
     { method: 'DELETE', path: '/v2/actor-tasks/{taskId}', category: 'Tasks', summary: 'Delete task' },
-    { method: 'POST', path: '/v2/actor-tasks/{taskId}/run', category: 'Tasks', summary: 'Run task' },
+    { method: 'POST', path: '/v2/actor-tasks/{taskId}/runs', category: 'Tasks', summary: 'Run task' },
     { method: 'POST', path: '/v2/actor-tasks/{taskId}/run-sync', category: 'Tasks', summary: 'Run task synchronously' },
     { method: 'GET', path: '/v2/actor-tasks/{taskId}/runs', category: 'Tasks', summary: 'List task runs' },
-    { method: 'GET', path: '/v2/actor-tasks/{taskId}/runs/{runId}', category: 'Tasks', summary: 'Get task run details' },
+    { method: 'GET', path: '/v2/actor-tasks/{taskId}/runs/last', category: 'Tasks', summary: 'Get last task run' },
 
     // ── Schedules ──
     { method: 'GET', path: '/v2/schedules', category: 'Schedules', summary: 'List schedules' },
@@ -152,8 +152,8 @@ export const API_ENDPOINTS: ApiEndpoint[] = [
     { method: 'GET', path: '/v2/webhooks/{webhookId}', category: 'Webhooks', summary: 'Get webhook details' },
     { method: 'PUT', path: '/v2/webhooks/{webhookId}', category: 'Webhooks', summary: 'Update webhook' },
     { method: 'DELETE', path: '/v2/webhooks/{webhookId}', category: 'Webhooks', summary: 'Delete webhook' },
-    { method: 'GET', path: '/v2/webhooks/{webhookId}/test', category: 'Webhooks', summary: 'Test webhook' },
-    { method: 'POST', path: '/v2/webhooks/{webhookId}/dispatches', category: 'Webhooks', summary: 'Dispatch webhook' },
+    { method: 'POST', path: '/v2/webhooks/{webhookId}/test', category: 'Webhooks', summary: 'Send a test dispatch' },
+    { method: 'GET', path: '/v2/webhooks/{webhookId}/dispatches', category: 'Webhooks', summary: 'List webhook dispatches for webhook' },
 
     // ── Webhook Dispatches ──
     { method: 'GET', path: '/v2/webhook-dispatches', category: 'Webhooks', summary: 'List webhook dispatches' },
@@ -195,15 +195,15 @@ export const API_ENDPOINTS: ApiEndpoint[] = [
     { method: 'GET', path: '/v2/search', category: 'Search', summary: 'Search actors, tasks, datasets' },
 
     // ── Standby ──
-    { method: 'ALL', path: '/v2/standby/{username}/{actorName}', category: 'Standby', summary: 'Standby actor endpoint' },
-    { method: 'ALL', path: '/v2/standby/{username}/{actorName}/*', category: 'Standby', summary: 'Standby actor proxy' },
+    { method: 'ALL', path: '/v2/{username}/{actorName}', category: 'Standby', summary: 'Standby actor endpoint' },
+    { method: 'ALL', path: '/v2/{username}/{actorName}/*', category: 'Standby', summary: 'Standby actor proxy' },
 
     // ── Admin (internal) ──
-    { method: 'GET', path: '/admin/cluster/stats', category: 'Admin', summary: 'Cluster statistics' },
-    { method: 'POST', path: '/admin/jobs/storage-usage/run', category: 'Admin', summary: 'Run storage usage job' },
-    { method: 'POST', path: '/admin/jobs/ttl-cleanup/run', category: 'Admin', summary: 'Run TTL cleanup job' },
-    { method: 'POST', path: '/admin/jobs/s3-cleanup/run', category: 'Admin', summary: 'Run S3 cleanup job' },
-    { method: 'POST', path: '/admin/jobs/actor-tester/run', category: 'Admin', summary: 'Run actor tester job' },
+    { method: 'GET', path: '/admin/users/cluster/stats', category: 'Admin', summary: 'Cluster statistics' },
+    { method: 'POST', path: '/admin/users/jobs/storage-usage/run', category: 'Admin', summary: 'Run storage usage job' },
+    { method: 'POST', path: '/admin/users/jobs/ttl-cleanup/run', category: 'Admin', summary: 'Run TTL cleanup job' },
+    { method: 'POST', path: '/admin/users/jobs/s3-cleanup/run', category: 'Admin', summary: 'Run S3 cleanup job' },
+    { method: 'POST', path: '/admin/users/jobs/actor-tester/run', category: 'Admin', summary: 'Run actor tester job' },
     { method: 'GET', path: '/admin/users/list', category: 'Admin', summary: 'List users' },
     { method: 'GET', path: '/admin/users/{userId}/info', category: 'Admin', summary: 'Get user info' },
     { method: 'GET', path: '/admin/users/{userId}/api-key', category: 'Admin', summary: 'Get user API key' },
@@ -286,21 +286,24 @@ function describeEndpoint(endpointPath: string): void {
         path = '/v2' + path;
     }
 
-    const endpoint = API_ENDPOINTS.find(
+    // A path can have several methods (GET and PUT, ...): describe each.
+    const matches = API_ENDPOINTS.filter(
         (ep) => ep.path === path || ep.path.replace(/{[^}]+}/g, '*') === path.replace(/{[^}]+}/g, '*'),
     );
 
-    if (!endpoint) {
+    if (matches.length === 0) {
         console.log(chalk.yellow(`Endpoint not found: ${endpointPath}`));
         console.log(chalk.gray('Use --list-endpoints to see all available endpoints.'));
         return;
     }
 
+    const endpoint = matches[0]!;
     console.log(chalk.bold(`Endpoint: ${endpoint.path}`));
     console.log();
-    console.log(`  Method: ${chalk.cyan(endpoint.method)}`);
+    for (const ep of matches) {
+        console.log(`  Method: ${chalk.cyan(ep.method)}  ${ep.summary}`);
+    }
     console.log(`  Category: ${chalk.gray(endpoint.category)}`);
-    console.log(`  Summary: ${endpoint.summary}`);
     console.log();
 
     // Extract path parameters
@@ -314,12 +317,14 @@ function describeEndpoint(endpointPath: string): void {
     }
 
     console.log(chalk.gray('Usage:'));
-    if (endpoint.method === 'GET' || endpoint.method === 'ALL') {
-        console.log(chalk.gray(`  scrapely api ${endpoint.path}`));
-    } else if (endpoint.method === 'POST' || endpoint.method === 'PUT') {
-        console.log(chalk.gray(`  scrapely api ${endpoint.method} ${endpoint.path} -d '{"key": "value"}'`));
-    } else if (endpoint.method === 'DELETE') {
-        console.log(chalk.gray(`  scrapely api DELETE ${endpoint.path}`));
+    for (const ep of matches) {
+        if (ep.method === 'GET' || ep.method === 'ALL') {
+            console.log(chalk.gray(`  scrapely api ${ep.path}`));
+        } else if (ep.method === 'POST' || ep.method === 'PUT' || ep.method === 'PATCH') {
+            console.log(chalk.gray(`  scrapely api ${ep.method} ${ep.path} -d '{"key": "value"}'`));
+        } else if (ep.method === 'DELETE') {
+            console.log(chalk.gray(`  scrapely api DELETE ${ep.path}`));
+        }
     }
 }
 

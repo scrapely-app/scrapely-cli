@@ -1027,6 +1027,9 @@ export async function createCommand(actorName?: string, options?: { template?: s
                 console.error(chalk.red(`Error: No templates found${language ? ` for language "${language}"` : ''}${useCase ? ` with use case "${useCase}"` : ''}.`));
                 console.log(chalk.gray(`Available languages: ${languages}`));
                 console.log(chalk.gray(`Available use cases: ${useCases}`));
+                if (language === 'python') {
+                    console.log(chalk.gray('There are no Python templates. Create a Python actor from your own repository with --git-repo <url>.'));
+                }
                 process.exit(1);
             }
 

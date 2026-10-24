@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.17] - 2026-10-24
+
+- `-v` / `--version` prints the CLI version only before a command (`scrapely -v`). After a command it belongs to that command again: `push -v`, `actors push -v`, `pull -v`, `actors pull -v`, `builds create --version`, `actors build --version` and `upgrade --version` get their version, and `runs info -v` is verbose. Before, all of them printed the CLI version and exited 0 without doing anything.
+- `scrapely info`: a token the API rejects (401/403) is reported as rejected, with exit code 1, instead of "Could not reach the API" with the saved account and exit code 0. Other HTTP errors also exit 1. The saved account is shown (marked as possibly stale) only when the API can't be reached at all and the saved login is the token in use; that fallback now comes after a few seconds instead of minutes. A `SCRAPELY_TOKEN` for another account no longer overwrites the saved login's account.
+- `scrapely actor get-public-url` prints a signed URL (`?signature=...`, valid for one hour, `--expires-in <seconds>` to change it) on the public API host, which works without a token. Before, it printed an unsigned `?enablePublicUrl=true` URL that answered 404 without a token. If the token can't read the store's signing key, the command fails instead of printing a link that doesn't work.
+- `scrapely actor charge` on a run that has finished stops at once with "Run ... has finished (status ...)" and exit code 1. Before, it sent the charge, got `503 ledger-unavailable` (the server only takes charges while the run is running) and retried for about 4 minutes.
+- `scrapely actors start` without an actor ID uses the actor of the project in the current directory, as `call` does.
+- `scrapely builds create --json` without `--wait` exits 0 and prints the build. With `--wait`, the exit code still reflects the build outcome.
+- `scrapely api --list-endpoints` / `--describe` match the server's routes: `POST /v2/webhooks/{id}/test`, `GET /v2/webhooks/{id}/dispatches`, `POST /v2/actor-tasks/{id}/runs`, `GET /v2/actor-tasks/{id}/runs/last`, standby at `/v2/{username}/{actorName}`, the admin job routes under `/admin/users/`, plus `GET /v2/actors/{id}/builds/default` and `POST /v2/actor-builds/{id}/abort`. Entries for routes that don't exist were removed. `--describe` lists every method of a path.
+- Links to the console (`login -m console`, `push --open`, the landing page printed by `task publish`) go to `https://my.scrape.ly` for the production API (`api.scrape.ly`) and `https://my-staging.scrape.ly` for staging. Before, production links went to `https://scrape.ly`. Other `api.` / `api-*.` hosts map to `my.` / `my-*.`; any other host is used as is, and `SCRAPELY_WEB_URL` overrides it.
+- `scrapely create -l python` says there are no Python templates and points to `--git-repo`.
+- Package metadata and README link the CLI reference at `https://scrape.ly/docs/cli` (the old `/docs/sdk-cli` link answered 404).
+
 ## [0.1.16] - 2026-10-22
 
 - `scrapely login` (browser): the page the browser lands on after sign-in matches the Scrape.ly console (light or dark with the system, works offline). Cancelling on the consent screen now reads "Sign-in cancelled" instead of "Login failed: access_denied"; other errors read "Sign-in failed" with the reason.
@@ -16,7 +29,7 @@ All notable changes to this project will be documented in this file.
 
 - `scrapely mcp` now runs scrapely-mcp 0.3.1.
 - `scrapely api --list`: `/v2/actors/{id}/input` and `/run-options` are no longer listed (the API removed them; use saved inputs).
-- `scrapely create`: the Python templates and `cli-start` are no longer offered (they were removed from the templates repo). Python projects can still be scaffolded from a repository with `--git-repo`.
+- `scrapely create`: the bundled fallback list no longer has the Python templates and `cli-start`. The live list from the API still offered them until the API stopped serving them (2026-10-24, see 0.1.17); they are still in the templates repo. Python projects can be created from a repository with `--git-repo`.
 
 ## [0.1.13] - 2026-10-20
 

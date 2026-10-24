@@ -5,21 +5,9 @@ import chalk from 'chalk';
 import { Command } from 'commander';
 import { join, dirname } from 'path';
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs';
-import { getApiBaseUrl, getToken } from '../config.js';
+import { getToken } from '../config.js';
 import { getRuntimeClient } from '../client.js';
 import { safeResolve, validatePathWithinDir } from '../utils/pathValidation.js';
-
-/**
- * Resolve API base URL: actor-runtime env first, then CLI config.
- */
-function resolveApiBaseUrl(): string {
-    return (
-        process.env.APIFY_API_BASE_URL ||
-        process.env.SCRAPELY_API_BASE_URL ||
-        process.env.SCRAPELY_API_URL ||
-        getApiBaseUrl()
-    );
-}
 
 /**
  * Check if a runtime API base URL is being used (from env vars).
@@ -314,14 +302,20 @@ export async function setValueCommand(
 
 /**
  * actor get-public-url - Get a public URL for a key-value store record
+ *
+ * The URL carries a `signature` (HMAC of the store's URL signing key, the
+ * record path and an expiry), which the server accepts in place of a token.
+ * The key comes from the store itself (GET /v2/key-value-stores/{id}), so the
+ * token in use must be able to read the store; the run token can read its own
+ * default store. Without access to the key the URL would need a token, so the
+ * command fails instead of printing a link that answers 404.
  */
-export async function getPublicUrlCommand(key: string): Promise<void> {
+export async function getPublicUrlCommand(key: string, options?: { expiresIn?: number }): Promise<void> {
     if (!key) {
         console.error(chalk.red('Error: Key is required.'));
         process.exit(1);
     }
 
-    const apiBaseUrl = resolveApiBaseUrl();
     const defaultKvsId =
         process.env.ACTOR_DEFAULT_KEY_VALUE_STORE_ID ||
         process.env.APIFY_DEFAULT_KEY_VALUE_STORE_ID;
@@ -334,8 +328,27 @@ export async function getPublicUrlCommand(key: string): Promise<void> {
         process.exit(1);
     }
 
-    const publicUrl = `${apiBaseUrl}/v2/key-value-stores/${defaultKvsId}/records/${encodeURIComponent(key)}?enablePublicUrl=true`;
-    console.log(publicUrl);
+    const expiresInSecs = options?.expiresIn;
+    if (expiresInSecs !== undefined && (!Number.isFinite(expiresInSecs) || expiresInSecs <= 0)) {
+        console.error(chalk.red('Error: --expires-in must be a positive number of seconds.'));
+        process.exit(1);
+    }
+
+    try {
+        const url = await getRuntimeClient().keyValueStore(defaultKvsId).getRecordPublicUrl(key, {
+            ...(expiresInSecs !== undefined ? { expiresInSecs } : {}),
+        });
+        if (!new URL(url).searchParams.has('signature')) {
+            console.error(chalk.red(`Error: Could not sign a public URL for key-value store ${defaultKvsId}.`));
+            console.error(chalk.gray('The token in use cannot read the store\'s URL signing key. Run this inside the actor run, or log in as the store\'s owner.'));
+            process.exit(1);
+        }
+        console.log(url);
+    } catch (err) {
+        console.error(chalk.red('Error: Failed to create a public URL.'));
+        console.error(chalk.gray(`Details: ${(err as Error).message}`));
+        process.exit(1);
+    }
 }
 
 /**
@@ -371,8 +384,21 @@ export async function chargeCommand(
         process.exit(1);
     }
 
+    const client = getRuntimeClient();
+
+    // The server takes new charges only while the run is RUNNING. For a run
+    // that has ended it answers a charge with a fresh idempotency key with
+    // 503 ledger-unavailable (it keeps 503 rather than a final error because
+    // a request admitted while the run was running might still apply that
+    // key), and the client would retry that for minutes. Check first.
+    const ended = await endedRunStatus(client, runId);
+    if (ended) {
+        console.error(chalk.red(`Error: Run ${runId} has finished (status ${ended}). Charges are only accepted while the run is RUNNING.`));
+        process.exit(1);
+    }
+
     try {
-        await getRuntimeClient().run(runId).charge({
+        await client.run(runId).charge({
             eventName,
             ...(options?.count !== undefined ? { count: options.count } : {}),
             ...(options?.idempotencyKey ? { idempotencyKey: options.idempotencyKey } : {}),
@@ -380,9 +406,29 @@ export async function chargeCommand(
 
         console.log(chalk.green(`✓ Charged for event "${eventName}"`));
     } catch (err) {
+        // The run may have ended while the charge was being retried.
+        const endedNow = await endedRunStatus(client, runId);
         console.error(chalk.red('Error: Failed to charge for event.'));
+        if (endedNow) {
+            console.error(chalk.gray(`Run ${runId} has finished (status ${endedNow}). Charges are only accepted while the run is RUNNING.`));
+        }
         console.error(chalk.gray(`Details: ${(err as Error).message}`));
         process.exit(1);
+    }
+}
+
+/**
+ * The run's status when it is no longer RUNNING (or starting up), else null.
+ * Also null when the status can't be read: the charge request then decides.
+ */
+async function endedRunStatus(client: ReturnType<typeof getRuntimeClient>, runId: string): Promise<string | null> {
+    try {
+        const run = await client.run(runId).get();
+        const status = run?.status;
+        if (!status || status === 'RUNNING' || status === 'READY') return null;
+        return status;
+    } catch {
+        return null;
     }
 }
 
@@ -714,8 +760,9 @@ export function setupActorCommand(program: Command): void {
 
     actorCmd
         .command('get-public-url <key>')
-        .description('Get a public URL for a key-value store record')
-        .action(getPublicUrlCommand);
+        .description('Get a signed public URL for a record in the default key-value store (works without a token until it expires)')
+        .option('--expires-in <seconds>', 'How long the URL stays valid, in seconds (default: 3600)', (v: string) => Number(v))
+        .action((key, options) => getPublicUrlCommand(key, options));
 
     actorCmd
         .command('charge <eventName>')

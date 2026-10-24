@@ -9,7 +9,7 @@ a notice at the top of the file.
 Files containing portions derived from apify-cli (upstream paths in
 parentheses, relative to the apify-cli repository; compared against
 apify-cli v1.6.3 to v1.10.0):
-  src/index.ts                    (src/commands/actors/push.ts, actors/call.ts,
+  src/program.ts                  (src/commands/actors/push.ts, actors/call.ts,
                                    actors/pull.ts, src/commands/run.ts, init.ts)
   src/commands/actors.ts          (src/commands/actors/search.ts, push.ts, ls.ts)
   src/commands/api.ts             (src/commands/api.ts)

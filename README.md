@@ -25,11 +25,12 @@ scrapely login
 scrapely create my-actor --template crawlee-cheerio-js
 cd my-actor
 scrapely push
-scrapely call --input '{"url":"https://example.com"}'
+scrapely call --input '{"startUrls":[{"url":"https://example.com"}],"maxRequestsPerCrawl":1}'
 ```
 
 For non-interactive environments, provide `SCRAPELY_TOKEN` and optionally
-`SCRAPELY_API_URL` instead of running `login`.
+`SCRAPELY_API_URL` (default `https://api.scrape.ly`) instead of running `login`.
+`SCRAPELY_TOKEN` takes precedence over a saved login.
 
 ## MCP
 
@@ -44,7 +45,7 @@ with `uvx`, so [uv](https://docs.astral.sh/uv/) must be installed.
 
 ## Documentation
 
-See the [CLI guide](https://scrape.ly/docs/sdk-cli). Run `scrapely --help` to list every
+See the [CLI reference](https://scrape.ly/docs/cli). Run `scrapely --help` to list every
 command, and `scrapely <command> --help` for its options.
 
 ## License

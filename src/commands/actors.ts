@@ -228,6 +228,20 @@ export async function streamNewLogBytes(runId: string, offset: number): Promise<
     }
 }
 
+/**
+ * The given actor ID, else the actor of the project in the current directory
+ * (`actorId` in scrapely.json / .actor/actor.json, written by `scrapely push`).
+ * Exits 1 when there is neither.
+ */
+function actorIdOrLocal(actorId: string | undefined): string {
+    const resolved = actorId || getLocalConfig(process.cwd())?.actorId;
+    if (!resolved) {
+        console.error(chalk.red('Error: Actor ID is required. Run from a directory with a local actor configuration or pass an actor ID.'));
+        process.exit(1);
+    }
+    return resolved;
+}
+
 export async function actorCallCommand(actorId?: string, options?: {
     input?: string;
     inputFile?: string;
@@ -238,16 +252,7 @@ export async function actorCallCommand(actorId?: string, options?: {
     silent?: boolean;
     json?: boolean;
 }): Promise<void> {
-    // Fall back to the actor in the current directory's configuration (scrapely.json / .actor/actor.json)
-    if (!actorId) {
-        const localConfig = getLocalConfig(process.cwd());
-        actorId = localConfig?.actorId;
-    }
-
-    if (!actorId) {
-        console.error(chalk.red('Error: Actor ID is required. Run from a directory with a local actor configuration or pass an actor ID.'));
-        process.exit(1);
-    }
+    actorId = actorIdOrLocal(actorId);
 
     const jsonMode = !!options?.json;
     const silent = !!options?.silent || jsonMode;
@@ -319,7 +324,7 @@ export async function actorCallCommand(actorId?: string, options?: {
 /**
  * actors start - Execute actor asynchronously (returns immediately)
  */
-export async function actorStartCommand(actorId: string, options?: {
+export async function actorStartCommand(actorId: string | undefined, options?: {
     input?: string;
     inputFile?: string;
     build?: string;
@@ -327,10 +332,8 @@ export async function actorStartCommand(actorId: string, options?: {
     timeout?: number;
     json?: boolean;
 }): Promise<void> {
-    if (!actorId) {
-        console.error(chalk.red('Error: Actor ID is required.'));
-        process.exit(1);
-    }
+    // Same as `call`: default to the actor of the project in the current directory.
+    actorId = actorIdOrLocal(actorId);
 
     // Parse input (--input / --input-file, falling back to the local default
     // key-value store INPUT.json
