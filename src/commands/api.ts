@@ -6,7 +6,7 @@ import chalk from 'chalk';
 import { Command } from 'commander';
 import { getApiBaseUrl } from '../config.js';
 import { getLoggedClientOrThrow } from '../client.js';
-import { stdoutSafeText, terminalJson } from '../utils/terminal.js';
+import { stdoutSafeText, terminalJson, terminalSafeError } from '../utils/terminal.js';
 
 /**
  * API endpoint definitions for help — derived from scrapely-server route files.
@@ -504,7 +504,7 @@ export async function apiCommand(
             process.exit(1);
         }
         console.error(chalk.red('Error: Failed to make API request.'));
-        console.error(chalk.gray(`Details: ${(err as Error).message}`));
+        console.error(chalk.gray(`Details: ${terminalSafeError(err)}`));
         process.exit(1);
     }
 }

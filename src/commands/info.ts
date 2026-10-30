@@ -1,6 +1,7 @@
 import chalk from 'chalk';
 import { getCredentials, getApiBaseUrl, getToken, saveCredentials } from '../config.js';
 import { getLoggedClientOrThrow } from '../client.js';
+import { terminalSafeError } from '../utils/terminal.js';
 
 /** HTTP status of a failed API call, if the server answered at all. */
 function errorStatus(err: unknown): number | undefined {
@@ -33,7 +34,7 @@ export async function infoCommand(): Promise<void> {
         user = (await client.user().get()) as { id?: string; email?: string; username?: string; plan?: string | { id?: string } };
     } catch (err) {
         const status = errorStatus(err);
-        const details = (err as Error).message;
+        const details = terminalSafeError(err);
         if (status === 401 || status === 403) {
             console.error(chalk.red(`Error: The API at ${apiUrl} rejected the token (HTTP ${status}).`));
             console.error(chalk.gray(tokenFromEnv

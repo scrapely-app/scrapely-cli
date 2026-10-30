@@ -26,6 +26,7 @@ import {
     xorDependencies,
 } from 'mathjs';
 import { findActorConfig } from '../config.js';
+import { terminalSafeError } from '../utils/terminal.js';
 
 /**
  * `scrapely calculate-memory` / `scrapely actor calculate-memory`.
@@ -258,7 +259,7 @@ export async function calculateMemoryCommand(options: CalculateMemoryOptions = {
         const memory = clampMemory(calculated, minMemory, maxMemory);
         console.log(`Calculated memory: ${memory} MB`);
     } catch (err) {
-        console.error(chalk.red(`Error: Failed to calculate memory: ${(err as Error).message}`));
+        console.error(chalk.red(`Error: Failed to calculate memory: ${terminalSafeError(err)}`));
         process.exitCode = 1;
     }
 }

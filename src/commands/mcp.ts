@@ -6,6 +6,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { homedir } from 'os';
 import { dirname, join } from 'path';
 import { getCredentials } from '../config.js';
+import { terminalSafeError } from '../utils/terminal.js';
 
 /** Name of the server entry written into each client's MCP config. */
 export const MCP_SERVER_NAME = 'scrapely';
@@ -64,6 +65,17 @@ export function buildMcpEnv(token: string, apiBaseUrl?: string): Record<string, 
     const env: Record<string, string> = { SCRAPELY_TOKEN: token };
     if (apiBaseUrl) env.SCRAPELY_API_BASE_URL = apiBaseUrl;
     return env;
+}
+
+/**
+ * API origin written next to the token. The saved login token only ever goes
+ * with the origin it was saved for; the env overrides (same as getApiBaseUrl,
+ * without its local-dev default) apply only to a token that was also given
+ * explicitly (--token or SCRAPELY_TOKEN).
+ */
+export function resolveMcpApiBaseUrl(explicitToken: boolean, savedApiBaseUrl: string | undefined, env: NodeJS.ProcessEnv): string | undefined {
+    if (!explicitToken) return savedApiBaseUrl;
+    return env.SCRAPELY_API_BASE_URL || env.SCRAPELY_API_URL || savedApiBaseUrl;
 }
 
 /**
@@ -132,8 +144,7 @@ export async function mcpInstallCommand(client: string, options: { token?: strin
         appData: process.env.APPDATA,
         xdgConfigHome: process.env.XDG_CONFIG_HOME,
     });
-    // Same env overrides as getApiBaseUrl, without its local-dev default.
-    const env = buildMcpEnv(token, process.env.SCRAPELY_API_BASE_URL || process.env.SCRAPELY_API_URL || creds?.apiBaseUrl);
+    const env = buildMcpEnv(token, resolveMcpApiBaseUrl(!!(options.token || process.env.SCRAPELY_TOKEN), creds?.apiBaseUrl, process.env));
     const existing = existsSync(target.path) ? readFileSync(target.path, 'utf-8') : null;
 
     let updated: string;
@@ -142,7 +153,7 @@ export async function mcpInstallCommand(client: string, options: { token?: strin
             ? upsertCodexMcpServer(existing, env)
             : upsertJsonMcpServer(existing, target, env);
     } catch (error) {
-        console.error(chalk.red(`Error: Could not update ${target.path}: ${(error as Error).message}`));
+        console.error(chalk.red(`Error: Could not update ${target.path}: ${terminalSafeError(error)}`));
         process.exit(1);
     }
 

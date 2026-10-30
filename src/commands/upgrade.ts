@@ -109,7 +109,8 @@ export async function upgradeCommand(options?: { force?: boolean; version?: stri
             try {
                 // SECURITY: execFile with an argument array — the version is
                 // never interpolated into a shell command string.
-                await execFileAsync('npm', ['install', '-g', `${pkg}@${options.version}`], {
+                // --ignore-scripts: never run package lifecycle scripts on install.
+                await execFileAsync('npm', ['install', '-g', '--ignore-scripts', `${pkg}@${options.version}`], {
                     timeout: 60000
                 });
                 console.log(chalk.green(`✓ Installed ${pkg}@${options.version}`));
@@ -132,6 +133,13 @@ export async function upgradeCommand(options?: { force?: boolean; version?: stri
         console.error(chalk.red('Error: Could not check for updates. Please check your internet connection.'));
         process.exit(1);
     }
+
+    // SECURITY: install exactly the version that was checked (not the mutable
+    // `latest` tag), and only if it is a plain semver string.
+    if (!VERSION_SPECIFIER_PATTERN.test(latestVersion)) {
+        console.error(chalk.red(`Error: npm returned an invalid version: ${latestVersion}`));
+        process.exit(1);
+    }
     
     console.log(chalk.gray(`Latest version: ${latestVersion}`));
     
@@ -150,7 +158,7 @@ export async function upgradeCommand(options?: { force?: boolean; version?: stri
     let lastErr: unknown;
     for (const pkg of candidates) {
         try {
-            await execFileAsync('npm', ['install', '-g', `${pkg}@latest`], {
+            await execFileAsync('npm', ['install', '-g', '--ignore-scripts', `${pkg}@${latestVersion}`], {
                 timeout: 60000
             });
             console.log(chalk.green(`✓ Updated to ${pkg}@${latestVersion}`));

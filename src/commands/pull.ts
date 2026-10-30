@@ -42,13 +42,13 @@ export function safeFilePath(outputDir: string, fileName: string): string {
 
 /**
  * Git URL forms the CLI is willing to clone. Anything else is rejected —
- * notably `ext::sh -c ...` style git "URLs", which execute commands.
+ * notably `ext::sh -c ...` style git "URLs", which execute commands, and the
+ * unauthenticated http:// and git:// transports.
  */
 export function isSafeGitUrl(url: string): boolean {
-    return /^https?:\/\/[\w.@:/~-]+(?:\?[^\s]*)?$/.test(url)
+    return /^https:\/\/[\w.@:/~-]+(?:\?[^\s]*)?$/.test(url)
         || /^git@[\w.-]+:[\w./~-]+$/.test(url)
-        || /^ssh:\/\/git@[\w.-]+(?:\/[\w./~-]+)?$/.test(url)
-        || /^git:\/\/[\w.-]+(?:\/[\w./~-]+)?$/.test(url);
+        || /^ssh:\/\/git@[\w.-]+(?:\/[\w./~-]+)?$/.test(url);
 }
 
 /**
@@ -130,6 +130,37 @@ export function resolveCloneTarget(outputDir: string, repoUrl: string): string {
     return empty ? outputDir : join(outputDir, repoNameFromUrl(repoUrl));
 }
 
+/**
+ * Split userinfo (user:token@) off an HTTPS clone URL. The credentials go to
+ * git as an Authorization header through GIT_CONFIG_* env vars, so they never
+ * appear in process arguments or in the clone's saved origin URL.
+ */
+export function splitGitUrlCredentials(repoUrl: string): { repoUrl: string; env: Record<string, string> } {
+    const match = repoUrl.match(/^(https:\/\/)([^/@\s]*)@(.*)$/);
+    if (!match || !match[2]) return { repoUrl, env: {} };
+    const [, scheme, userinfo, rest] = match;
+    const sep = userinfo.indexOf(':');
+    const user = decodeURIComponent(sep === -1 ? userinfo : userinfo.slice(0, sep));
+    const password = sep === -1 ? '' : decodeURIComponent(userinfo.slice(sep + 1));
+    const basic = Buffer.from(`${user}:${password}`, 'utf-8').toString('base64');
+    return {
+        repoUrl: `${scheme}${rest}`,
+        env: {
+            GIT_CONFIG_COUNT: '1',
+            // Scoped to the repo's host so a redirect elsewhere never receives it.
+            GIT_CONFIG_KEY_0: `http.${scheme}${rest.split('/')[0]}/.extraHeader`,
+            GIT_CONFIG_VALUE_0: `Authorization: Basic ${basic}`,
+        },
+    };
+}
+
+/** Git config that only allows the https and ssh transports. */
+export const SAFE_GIT_PROTOCOLS = [
+    '-c', 'protocol.allow=never',
+    '-c', 'protocol.https.allow=always',
+    '-c', 'protocol.ssh.allow=always',
+];
+
 /** Build the `git clone` argument vector (execFile, never a shell string). */
 export function buildCloneArgs(repoUrl: string, branch: string | undefined, targetDir: string): string[] {
     return [
@@ -161,17 +192,21 @@ async function pullGitSource(options: {
 
     if (!isSafeGitUrl(repoUrl)) {
         console.error(chalk.red(`Refusing to clone unsupported git URL: ${redactGitUrlCredentials(repoUrl)}`));
-        console.error(chalk.gray('Only https://, git://, ssh:// and git@host: URLs are allowed.'));
+        console.error(chalk.gray('Only https://, ssh:// and git@host: URLs are allowed.'));
         process.exit(1);
     }
 
-    const target = resolveCloneTarget(outputDir, repoUrl);
+    const { repoUrl: cloneUrl, env: credentialEnv } = splitGitUrlCredentials(repoUrl);
+    const target = resolveCloneTarget(outputDir, cloneUrl);
     mkdirSync(dirname(target), { recursive: true });
 
     console.log(chalk.gray(`  Cloning ${redactGitUrlCredentials(repoUrl)}${branch ? ` (branch ${branch})` : ''} into ${target}...\n`));
 
     try {
-        await execFileAsync('git', buildCloneArgs(repoUrl, branch ?? undefined, target));
+        // Restrict git itself to authenticated transports too (redirects, submodules).
+        await execFileAsync('git', [...SAFE_GIT_PROTOCOLS, ...buildCloneArgs(cloneUrl, branch ?? undefined, target)], {
+            env: { ...process.env, ...credentialEnv },
+        });
     } catch (err) {
         const e = err as { code?: string; stderr?: string; message?: string };
         if (e.code === 'ENOENT') {

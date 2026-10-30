@@ -6,7 +6,123 @@
  */
 
 import path from 'path';
-import { realpathSync } from 'fs';
+import { closeSync, constants, fstatSync, lstatSync, openSync, readFileSync, realpathSync, writeFileSync } from 'fs';
+
+/**
+ * Canonicalize a path that may not exist yet: realpath of the deepest existing
+ * ancestor, with the not-yet-existing tail appended.
+ */
+function canonicalize(p: string): string {
+    let existing = path.resolve(p);
+    const tail: string[] = [];
+    for (;;) {
+        try {
+            return path.join(realpathSync(existing), ...tail);
+        } catch {
+            // A dangling symlink exists but cannot be resolved — never treat it as missing
+            let dangling = false;
+            try {
+                dangling = lstatSync(existing).isSymbolicLink();
+            } catch {
+                // Really missing
+            }
+            if (dangling) throw new Error(`Refusing to follow dangling symbolic link: ${existing}`);
+            const parent = path.dirname(existing);
+            if (parent === existing) return path.resolve(p);
+            tail.unshift(path.basename(existing));
+            existing = parent;
+        }
+    }
+}
+
+function isWithin(child: string, parent: string): boolean {
+    return child === parent || child.startsWith(parent + path.sep);
+}
+
+/**
+ * Throw if `target` (after following symlinks in its existing part) is outside
+ * `baseDir` (also canonicalized). Catches project-local symlinks that point out.
+ */
+export function assertRealPathWithin(target: string, baseDir: string): void {
+    if (!isWithin(canonicalize(target), canonicalize(baseDir))) {
+        throw new Error(`Path "${target}" resolves outside of "${baseDir}" (symbolic link)`);
+    }
+}
+
+/** lstat every component of relPath under baseDir; throw on any symlink. */
+function assertNoSymlinkComponents(baseDir: string, relPath: string, allowMissingLeaf: boolean): void {
+    const parts = path.normalize(relPath).split(path.sep).filter((p) => p && p !== '.');
+    let current = path.resolve(baseDir);
+    for (let i = 0; i < parts.length; i++) {
+        current = path.join(current, parts[i]);
+        let st;
+        try {
+            st = lstatSync(current);
+        } catch (err: any) {
+            if (allowMissingLeaf && i === parts.length - 1 && err.code === 'ENOENT') return;
+            throw err;
+        }
+        if (st.isSymbolicLink()) {
+            const e: NodeJS.ErrnoException = new Error(`Refusing to follow symbolic link: ${current}`);
+            e.code = 'ELOOP';
+            throw e;
+        }
+    }
+}
+
+/**
+ * Open `relPath` under `baseDir` without following symlinks anywhere in the path.
+ * Every component is checked before and after the open, the leaf is opened with
+ * O_NOFOLLOW, and the opened fd must be the same regular file (dev/ino) that is
+ * at the in-project path afterwards — so a directory swapped to a symlink and
+ * back during the open is detected. Returns the fd; the caller closes it.
+ */
+export function openNoFollowWithin(baseDir: string, relPath: string, flags: number): number {
+    const fullPath = validatePathWithinDir(relPath, baseDir);
+    const relative = path.relative(path.resolve(baseDir), fullPath);
+    const creating = (flags & constants.O_CREAT) !== 0;
+    assertNoSymlinkComponents(baseDir, relative, creating);
+    const fd = openSync(fullPath, flags | (constants.O_NOFOLLOW ?? 0), 0o666);
+    try {
+        const opened = fstatSync(fd);
+        if (!opened.isFile()) {
+            const e: NodeJS.ErrnoException = new Error(`Not a regular file: ${fullPath}`);
+            e.code = 'EISDIR';
+            throw e;
+        }
+        assertNoSymlinkComponents(baseDir, relative, false);
+        const atPath = lstatSync(fullPath);
+        if (atPath.dev !== opened.dev || atPath.ino !== opened.ino) {
+            const e: NodeJS.ErrnoException = new Error(`File changed while opening: ${fullPath}`);
+            e.code = 'ELOOP';
+            throw e;
+        }
+        return fd;
+    } catch (err) {
+        closeSync(fd);
+        throw err;
+    }
+}
+
+/** Read a file under baseDir without following symlinks (see openNoFollowWithin). */
+export function readFileNoFollowWithin(baseDir: string, relPath: string): Buffer {
+    const fd = openNoFollowWithin(baseDir, relPath, constants.O_RDONLY);
+    try {
+        return readFileSync(fd);
+    } finally {
+        closeSync(fd);
+    }
+}
+
+/** Create/overwrite a file under baseDir without following symlinks (see openNoFollowWithin). */
+export function writeFileNoFollowWithin(baseDir: string, relPath: string, data: string): void {
+    const fd = openNoFollowWithin(baseDir, relPath, constants.O_WRONLY | constants.O_CREAT | constants.O_TRUNC);
+    try {
+        writeFileSync(fd, data);
+    } finally {
+        closeSync(fd);
+    }
+}
 
 /**
  * Validate that a path stays within the allowed base directory.
@@ -27,6 +143,8 @@ export function validatePathWithinDir(userPath: string, baseDir: string): string
     if (!resolvedPath.startsWith(resolvedBase + path.sep) && resolvedPath !== resolvedBase) {
         throw new Error(`Path traversal detected: "${userPath}" resolves outside of "${baseDir}"`);
     }
+    // Lexical check passed; also reject project-local symlinks that point out
+    assertRealPathWithin(resolvedPath, resolvedBase);
     
     return resolvedPath;
 }
@@ -81,6 +199,7 @@ export function safeResolve(baseDir: string, userPath: string): string {
         if (!normalizedUserPath.startsWith(resolvedBase + path.sep)) {
             throw new Error(`Absolute path "${userPath}" is outside of "${baseDir}"`);
         }
+        assertRealPathWithin(normalizedUserPath, resolvedBase);
         return normalizedUserPath;
     }
     
@@ -94,16 +213,10 @@ export function safeResolve(baseDir: string, userPath: string): string {
  */
 export function isValidPathWithinDir(userPath: string, baseDir: string): boolean {
     try {
-        const resolved = safeResolve(baseDir, userPath);
-        // Try to get the real path (will throw if doesn't exist)
-        try {
-            const realPath = realpathSync(resolved);
-            const resolvedBase = path.resolve(baseDir);
-            return realPath.startsWith(resolvedBase + path.sep) || realPath === resolvedBase;
-        } catch {
-            // Path doesn't exist, but the resolved path is still valid
-            return true;
-        }
+        // safeResolve also checks the real (symlink-resolved) path, comparing
+        // against the real base and the nearest existing ancestor when missing
+        safeResolve(baseDir, userPath);
+        return true;
     } catch {
         return false;
     }

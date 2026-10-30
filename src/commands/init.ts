@@ -7,6 +7,7 @@ import { existsSync, writeFileSync, mkdirSync, readFileSync, readdirSync } from 
 import { join } from 'path';
 import { safeResolve, validateFilename } from '../utils/pathValidation.js';
 import { ACTOR_CONFIG_FILES } from '../config.js';
+import { terminalSafeLine, terminalSafeError } from '../utils/terminal.js';
 
 
 function validateActorName(input: string): string | boolean {
@@ -134,7 +135,7 @@ export function ensureScrapyRequirements(content: string): { content: string; ch
     const lines = content.split('\n').flatMap((line) => {
         const name = requirementName(line);
         if (name === 'scrapely') {
-            changes.push(`Replaced "${line.trim()}" with ${PYPI_SDK_PACKAGE} in requirements.txt (PyPI "scrapely" is an unrelated package)`);
+            changes.push(`Replaced "${terminalSafeLine(line.trim())}" with ${PYPI_SDK_PACKAGE} in requirements.txt (PyPI "scrapely" is an unrelated package)`);
             if (hasSdk) return [];
             hasSdk = true;
             return [PYPI_SDK_PACKAGE];
@@ -163,7 +164,7 @@ export async function initCommand(name?: string, options?: { dockerfile?: string
         try {
             validateFilename(name);
         } catch (err) {
-            console.error(chalk.red(`Error: Invalid directory name: ${(err as Error).message}`));
+            console.error(chalk.red(`Error: Invalid directory name: ${terminalSafeError(err)}`));
             process.exit(1);
         }
     }
@@ -172,7 +173,7 @@ export async function initCommand(name?: string, options?: { dockerfile?: string
     try {
         targetDir = name ? safeResolve(cwd, name) : cwd;
     } catch (err) {
-        console.error(chalk.red(`Error: Invalid target directory: ${(err as Error).message}`));
+        console.error(chalk.red(`Error: Invalid target directory: ${terminalSafeError(err)}`));
         process.exit(1);
     }
 

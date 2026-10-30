@@ -11,6 +11,9 @@ import { createHash, randomBytes } from 'crypto';
 import { createServer, IncomingMessage, ServerResponse } from 'http';
 import { execFile } from 'child_process';
 
+import { assertSecureApiBaseUrl } from '../config.js';
+import { terminalSafeLine } from './terminal.js';
+
 export function openUrl(rawUrl: string): void {
     let href: string;
     try {
@@ -58,7 +61,7 @@ async function fetchJson(url: string, init: RequestInit): Promise<any> {
     }
     const data = await response.json().catch(() => ({}));
     if (!response.ok) {
-        throw new Error(data?.error_description || data?.error || `Request failed with status ${response.status}`);
+        throw new Error(terminalSafeLine(data?.error_description || data?.error || `Request failed with status ${response.status}`));
     }
     return data;
 }
@@ -68,7 +71,7 @@ async function fetchJson(url: string, init: RequestInit): Promise<any> {
  * Resolves with the user's API token, or rejects with a descriptive error.
  */
 export async function loginWithBrowser(apiBaseUrl: string, clientName = 'Scrapely CLI'): Promise<string> {
-    const base = apiBaseUrl.replace(/\/+$/, '');
+    const base = assertSecureApiBaseUrl(apiBaseUrl).replace(/\/+$/, '');
 
     // 1. PKCE pair
     const codeVerifier = randomBytes(48).toString('base64url');
@@ -249,7 +252,7 @@ function startCallbackServer(): Promise<CallbackServer> {
         });
 
         const server = createServer((req: IncomingMessage, res: ServerResponse) => {
-            console.log(`[oauth] ← ${req.method} ${req.url}`);
+            console.log(`[oauth] ← ${terminalSafeLine(req.method)} ${terminalSafeLine(req.url)}`);
             const url = new URL(req.url ?? '/', 'http://127.0.0.1');
             const code = url.searchParams.get('code');
             const error = url.searchParams.get('error');
@@ -268,11 +271,11 @@ function startCallbackServer(): Promise<CallbackServer> {
             } else {
                 settled = true;
                 const description = url.searchParams.get('error_description') || error || 'unknown_error';
-                console.log(`[oauth] browser reported failure: ${description}`);
+                console.log(`[oauth] browser reported failure: ${terminalSafeLine(description)}`);
                 res.end(error === 'access_denied'
                     ? callbackPage('cancelled', 'Sign-in cancelled', 'Nothing was connected. Go back to your terminal; you can close this tab.')
                     : callbackPage('failed', 'Sign-in failed', `${description} Go back to your terminal and try again.`));
-                rejectCallback(new Error(`Authorization failed: ${description}`));
+                rejectCallback(new Error(`Authorization failed: ${terminalSafeLine(description)}`));
             }
         });
 

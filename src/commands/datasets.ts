@@ -4,6 +4,7 @@ import chalk from 'chalk';
 import { Command, Option } from 'commander';
 import inquirer from 'inquirer';
 import { getLoggedClientOrThrow } from '../client.js';
+import { stdoutSafeText, terminalJson, terminalSafeError } from '../utils/terminal.js';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -43,7 +44,7 @@ export async function createDatasetCommand(name?: string, options?: { json?: boo
         }
     } catch (err) {
         console.error(chalk.red('Error: Failed to create dataset.'));
-        console.error(chalk.gray(`Details: ${(err as Error).message}`));
+        console.error(chalk.gray(`Details: ${terminalSafeError(err)}`));
         process.exit(1);
     }
 }
@@ -79,7 +80,7 @@ export async function removeDatasetCommand(datasetIdOrName: string, options?: { 
         console.log(chalk.green(`✓ Dataset ${datasetIdOrName} deleted successfully`));
     } catch (err) {
         console.error(chalk.red('Error: Failed to delete dataset.'));
-        console.error(chalk.gray(`Details: ${(err as Error).message}`));
+        console.error(chalk.gray(`Details: ${terminalSafeError(err)}`));
         process.exit(1);
     }
 }
@@ -99,7 +100,7 @@ export async function renameDatasetCommand(datasetIdOrName: string, newName?: st
             console.log(chalk.green(`✓ Dataset ${datasetIdOrName} unnamed successfully`));
         } catch (err) {
             console.error(chalk.red('Error: Failed to unname dataset.'));
-            console.error(chalk.gray(`Details: ${(err as Error).message}`));
+            console.error(chalk.gray(`Details: ${terminalSafeError(err)}`));
             process.exit(1);
         }
         return;
@@ -115,7 +116,7 @@ export async function renameDatasetCommand(datasetIdOrName: string, newName?: st
         console.log(chalk.green(`✓ Dataset renamed to "${newName}" successfully`));
     } catch (err) {
         console.error(chalk.red('Error: Failed to rename dataset.'));
-        console.error(chalk.gray(`Details: ${(err as Error).message}`));
+        console.error(chalk.gray(`Details: ${terminalSafeError(err)}`));
         process.exit(1);
     }
 }
@@ -142,16 +143,16 @@ export async function getItemsCommand(datasetId: string, options?: { format?: st
         let resultText: string;
         if (format === 'json') {
             const { items } = await getLoggedClientOrThrow().dataset(await resolveDatasetId(datasetId)).listItems(itemsOptions);
-            resultText = JSON.stringify(items, null, 2);
+            resultText = terminalJson(JSON.stringify(items, null, 2));
         } else {
             const data = await getLoggedClientOrThrow().dataset(await resolveDatasetId(datasetId)).downloadItems(format, itemsOptions);
-            resultText = Buffer.isBuffer(data) ? data.toString('utf-8') : String(data);
+            resultText = stdoutSafeText(Buffer.isBuffer(data) ? data.toString('utf-8') : String(data));
         }
 
         console.log(resultText);
     } catch (err) {
         console.error(chalk.red('Error: Failed to get dataset items.'));
-        console.error(chalk.gray(`Details: ${(err as Error).message}`));
+        console.error(chalk.gray(`Details: ${terminalSafeError(err)}`));
         process.exit(1);
     }
 }
@@ -202,7 +203,7 @@ export async function pushItemsCommand(datasetId: string, item?: string): Promis
         console.log(chalk.green('✓ Items pushed successfully'));
     } catch (err) {
         console.error(chalk.red('Error: Failed to push items to dataset.'));
-        console.error(chalk.gray(`Details: ${(err as Error).message}`));
+        console.error(chalk.gray(`Details: ${terminalSafeError(err)}`));
         process.exit(1);
     }
 }
@@ -235,7 +236,7 @@ export async function listDatasetsCommand(options?: { limit?: number; offset?: n
         }
     } catch (err) {
         console.error(chalk.red('Error: Failed to list datasets.'));
-        console.error(chalk.gray(`Details: ${(err as Error).message}`));
+        console.error(chalk.gray(`Details: ${terminalSafeError(err)}`));
         process.exit(1);
     }
 }
@@ -272,7 +273,7 @@ export async function datasetInfoCommand(datasetId: string, options?: { json?: b
         }
     } catch (err) {
         console.error(chalk.red('Error: Failed to get dataset info.'));
-        console.error(chalk.gray(`Details: ${(err as Error).message}`));
+        console.error(chalk.gray(`Details: ${terminalSafeError(err)}`));
         process.exit(1);
     }
 }

@@ -5,7 +5,7 @@ import { Command } from 'commander';
 import inquirer from 'inquirer';
 import { getActorConfig } from '../config.js';
 import { getLoggedClientOrThrow } from '../client.js';
-import { stdoutSafeText, terminalJson } from '../utils/terminal.js';
+import { stdoutSafeText, terminalJson, terminalSafeError } from '../utils/terminal.js';
 
 /**
  * runs ls - List runs
@@ -48,7 +48,7 @@ export async function listRunsCommand(options?: { actorId?: string; limit?: numb
         }
     } catch (err) {
         console.error(chalk.red('Error: Failed to list runs.'));
-        console.error(chalk.gray(`Details: ${(err as Error).message}`));
+        console.error(chalk.gray(`Details: ${terminalSafeError(err)}`));
         process.exit(1);
     }
 }
@@ -99,7 +99,7 @@ export async function runInfoCommand(runId: string, options?: { verbose?: boolea
         }
     } catch (err) {
         console.error(chalk.red('Error: Failed to get run info.'));
-        console.error(chalk.gray(`Details: ${(err as Error).message}`));
+        console.error(chalk.gray(`Details: ${terminalSafeError(err)}`));
         process.exit(1);
     }
 }
@@ -125,7 +125,7 @@ export async function runLogCommand(runId: string): Promise<void> {
         }
     } catch (err) {
         console.error(chalk.red('Error: Failed to get run logs.'));
-        console.error(chalk.gray(`Details: ${(err as Error).message}`));
+        console.error(chalk.gray(`Details: ${terminalSafeError(err)}`));
         process.exit(1);
     }
 }
@@ -151,7 +151,7 @@ export async function runAbortCommand(runId: string, options?: { force?: boolean
         console.log(chalk.green(`✓ Run ${runId} aborted`));
     } catch (err) {
         console.error(chalk.red('Error: Failed to abort run.'));
-        console.error(chalk.gray(`Details: ${(err as Error).message}`));
+        console.error(chalk.gray(`Details: ${terminalSafeError(err)}`));
         process.exit(1);
     }
 }
@@ -219,7 +219,7 @@ export async function runWaitCommand(runId: string, options?: { timeout?: number
         }
     } catch (err) {
         console.error(chalk.red('Error: Failed to wait for run.'));
-        console.error(chalk.gray(`Details: ${(err as Error).message}`));
+        console.error(chalk.gray(`Details: ${terminalSafeError(err)}`));
         process.exit(1);
     }
 }
@@ -245,7 +245,7 @@ export async function runResurrectCommand(runId: string, options?: { json?: bool
         console.log(chalk.gray(`  New status: ${run.status}`));
     } catch (err) {
         console.error(chalk.red('Error: Failed to resurrect run.'));
-        console.error(chalk.gray(`Details: ${(err as Error).message}`));
+        console.error(chalk.gray(`Details: ${terminalSafeError(err)}`));
         process.exit(1);
     }
 }
@@ -281,7 +281,7 @@ export async function runRmCommand(runId: string, options?: { yes?: boolean }): 
         console.log(chalk.green(`✓ Run ${runId} deleted successfully`));
     } catch (err) {
         console.error(chalk.red('Error: Failed to delete run.'));
-        console.error(chalk.gray(`Details: ${(err as Error).message}`));
+        console.error(chalk.gray(`Details: ${terminalSafeError(err)}`));
         process.exit(1);
     }
 }

@@ -4,6 +4,7 @@ import chalk from 'chalk';
 import { Command } from 'commander';
 import inquirer from 'inquirer';
 import { getLoggedClientOrThrow } from '../client.js';
+import { stdoutSafeText, terminalJson, terminalSafeError } from '../utils/terminal.js';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -43,7 +44,7 @@ export async function createKvsCommand(name?: string, options?: { json?: boolean
         }
     } catch (err) {
         console.error(chalk.red('Error: Failed to create key-value store.'));
-        console.error(chalk.gray(`Details: ${(err as Error).message}`));
+        console.error(chalk.gray(`Details: ${terminalSafeError(err)}`));
         process.exit(1);
     }
 }
@@ -79,7 +80,7 @@ export async function removeKvsCommand(storeIdOrName: string, options?: { yes?: 
         console.log(chalk.green(`✓ Key-value store ${storeIdOrName} deleted successfully`));
     } catch (err) {
         console.error(chalk.red('Error: Failed to delete key-value store.'));
-        console.error(chalk.gray(`Details: ${(err as Error).message}`));
+        console.error(chalk.gray(`Details: ${terminalSafeError(err)}`));
         process.exit(1);
     }
 }
@@ -99,7 +100,7 @@ export async function renameKvsCommand(storeIdOrName: string, newName?: string, 
             console.log(chalk.green(`✓ Key-value store ${storeIdOrName} unnamed successfully`));
         } catch (err) {
             console.error(chalk.red('Error: Failed to unname key-value store.'));
-            console.error(chalk.gray(`Details: ${(err as Error).message}`));
+            console.error(chalk.gray(`Details: ${terminalSafeError(err)}`));
             process.exit(1);
         }
         return;
@@ -115,7 +116,7 @@ export async function renameKvsCommand(storeIdOrName: string, newName?: string, 
         console.log(chalk.green(`✓ Key-value store renamed to "${newName}" successfully`));
     } catch (err) {
         console.error(chalk.red('Error: Failed to rename key-value store.'));
-        console.error(chalk.gray(`Details: ${(err as Error).message}`));
+        console.error(chalk.gray(`Details: ${terminalSafeError(err)}`));
         process.exit(1);
     }
 }
@@ -151,7 +152,7 @@ export async function kvsDeleteValueCommand(storeId: string, key: string, option
         console.log(chalk.green(`✓ Key '${key}' deleted successfully`));
     } catch (err) {
         console.error(chalk.red('Error: Failed to delete key from key-value store.'));
-        console.error(chalk.gray(`Details: ${(err as Error).message}`));
+        console.error(chalk.gray(`Details: ${terminalSafeError(err)}`));
         process.exit(1);
     }
 }
@@ -183,7 +184,9 @@ export async function kvsGetValueCommand(storeId: string, key: string, options?:
         }
 
         if (Buffer.isBuffer(record.value)) {
-            process.stdout.write(record.value);
+            // On a terminal the payload is decoded and sanitized; piped or
+            // redirected output keeps its exact bytes.
+            process.stdout.write(process.stdout.isTTY ? stdoutSafeText(record.value.toString('utf-8')) : record.value);
             // Append a trailing newline for text-like payloads so the output
             // doesn't run together with the shell prompt; binary payloads are
             // written verbatim.
@@ -192,13 +195,13 @@ export async function kvsGetValueCommand(storeId: string, key: string, options?:
                 process.stdout.write('\n');
             }
         } else if (typeof record.value === 'string') {
-            console.log(record.value);
+            console.log(stdoutSafeText(record.value));
         } else {
-            console.log(JSON.stringify(record.value, null, 2));
+            console.log(terminalJson(JSON.stringify(record.value, null, 2)));
         }
     } catch (err) {
         console.error(chalk.red('Error: Failed to get value from key-value store.'));
-        console.error(chalk.gray(`Details: ${(err as Error).message}`));
+        console.error(chalk.gray(`Details: ${terminalSafeError(err)}`));
         process.exit(1);
     }
 }
@@ -221,7 +224,7 @@ export async function kvsSetValueCommand(storeId: string, key: string, value?: s
             console.log(chalk.green(`✓ Key '${key}' deleted successfully`));
         } catch (err) {
             console.error(chalk.red('Error: Failed to delete key.'));
-            console.error(chalk.gray(`Details: ${(err as Error).message}`));
+            console.error(chalk.gray(`Details: ${terminalSafeError(err)}`));
             process.exit(1);
         }
         return;
@@ -245,7 +248,7 @@ export async function kvsSetValueCommand(storeId: string, key: string, value?: s
         console.log(chalk.green(`✓ Value set for key '${key}'`));
     } catch (err) {
         console.error(chalk.red('Error: Failed to set value in key-value store.'));
-        console.error(chalk.gray(`Details: ${(err as Error).message}`));
+        console.error(chalk.gray(`Details: ${terminalSafeError(err)}`));
         process.exit(1);
     }
 }
@@ -278,7 +281,7 @@ export async function listKvsCommand(options?: { limit?: number; offset?: number
         }
     } catch (err) {
         console.error(chalk.red('Error: Failed to list key-value stores.'));
-        console.error(chalk.gray(`Details: ${(err as Error).message}`));
+        console.error(chalk.gray(`Details: ${terminalSafeError(err)}`));
         process.exit(1);
     }
 }
@@ -315,7 +318,7 @@ export async function listKvsKeysCommand(storeId: string, options?: { limit?: nu
         }
     } catch (err) {
         console.error(chalk.red('Error: Failed to list keys.'));
-        console.error(chalk.gray(`Details: ${(err as Error).message}`));
+        console.error(chalk.gray(`Details: ${terminalSafeError(err)}`));
         process.exit(1);
     }
 }
@@ -351,7 +354,7 @@ export async function kvsInfoCommand(storeId: string, options?: { json?: boolean
         }
     } catch (err) {
         console.error(chalk.red('Error: Failed to get key-value store info.'));
-        console.error(chalk.gray(`Details: ${(err as Error).message}`));
+        console.error(chalk.gray(`Details: ${terminalSafeError(err)}`));
         process.exit(1);
     }
 }

@@ -4,6 +4,7 @@ import chalk from 'chalk';
 import { Command } from 'commander';
 import inquirer from 'inquirer';
 import { getSecrets, saveSecret, deleteSecret } from '../config.js';
+import { terminalSafeError } from '../utils/terminal.js';
 
 /**
  * Masked interactive prompt for a secret value (used when the value argument
@@ -48,7 +49,7 @@ export async function secretsAddCommand(name: string, value?: string): Promise<v
         console.log(chalk.green(`✓ Secret "${name}" added successfully`));
     } catch (err) {
         console.error(chalk.red('Error: Failed to save secret.'));
-        console.error(chalk.gray(`Details: ${(err as Error).message}`));
+        console.error(chalk.gray(`Details: ${terminalSafeError(err)}`));
         process.exit(1);
     }
 }

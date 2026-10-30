@@ -149,6 +149,26 @@ function purgeDefaultStorages(cwd: string): boolean {
 }
 
 /**
+ * Platform credentials a shell may carry (e.g. after `export SCRAPELY_TOKEN=...`).
+ * A local run must not pick them up implicitly: with a token the SDK can reach
+ * platform storage. The actor config's `environmentVariables` can still set them.
+ */
+export const PLATFORM_CREDENTIAL_ENV_VARS = [
+    'SCRAPELY_TOKEN',
+    'APIFY_TOKEN',
+    'SCRAPELY_PROXY_PASSWORD',
+    'APIFY_PROXY_PASSWORD',
+    'SCRAPELY_IS_AT_HOME',
+    'APIFY_IS_AT_HOME',
+];
+
+export function withoutPlatformCredentials(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+    const kept = { ...env };
+    for (const key of PLATFORM_CREDENTIAL_ENV_VARS) delete kept[key];
+    return kept;
+}
+
+/**
  * Resolve the actor config's `environmentVariables` for the local run.
  * Values referencing secrets (`@secretName`) are resolved from `scrapely secrets`.
  * Missing secrets throw unless --allow-missing-secrets is passed (then the variable
@@ -339,7 +359,7 @@ export async function runCommand(options: RunCommandOptions = {}): Promise<void>
     }
 
     const actorEnv = resolveActorEnv(actorConfig, options);
-    const runEnv: NodeJS.ProcessEnv = { ...process.env, ...actorEnv, ACTOR_INPUT_KEY: 'INPUT' };
+    const runEnv: NodeJS.ProcessEnv = { ...withoutPlatformCredentials(process.env), ...actorEnv, ACTOR_INPUT_KEY: 'INPUT' };
 
     const rawInput = resolveRawInput(options);
     const schema = loadInputSchema(cwd);

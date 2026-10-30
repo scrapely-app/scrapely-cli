@@ -4,6 +4,7 @@ import { execFile } from 'child_process';
 import { saveCredentials, getCredentials, getApiBaseUrl, getWebBaseUrl } from '../config.js';
 import { getClient } from '../client.js';
 import { loginWithBrowser } from '../utils/browserAuth.js';
+import { terminalSafeError, terminalSafeText } from '../utils/terminal.js';
 
 function openDashboardUrl(rawUrl: string): void {
     let href: string;
@@ -71,6 +72,14 @@ export async function loginCommand(options?: LoginOptions): Promise<void> {
     // silently falling through to a prompt.
     if (options?.method !== undefined && options?.method !== 'browser' && options?.method !== 'console' && options?.method !== 'manual') {
         console.error(chalk.red(`Error: Invalid login method "${options.method}". Use "browser", "console" or "manual".`));
+        process.exit(1);
+    }
+
+    // Refuse a plain-http remote API up front, before any token is entered or sent.
+    try {
+        getApiBaseUrl();
+    } catch (error) {
+        console.error(chalk.red(`Error: ${terminalSafeError(error)}`));
         process.exit(1);
     }
 
@@ -143,7 +152,7 @@ export async function loginCommand(options?: LoginOptions): Promise<void> {
             token = await loginWithBrowser(getApiBaseUrl());
         } catch (error) {
             const message = error instanceof Error ? error.message : 'Unknown error';
-            console.error(chalk.yellow(`\nBrowser login failed: ${message}`));
+            console.error(chalk.yellow(`\nBrowser login failed: ${terminalSafeText(message)}`));
             console.error(chalk.yellow(`Falling back to manual token entry (get one at ${getWebBaseUrl()}).`));
             const { promptedToken } = await inquirer.prompt([
                 {
@@ -184,7 +193,7 @@ export async function loginCommand(options?: LoginOptions): Promise<void> {
             console.error(chalk.red(`\n✗ Cannot reach the Scrapely API at ${getApiBaseUrl()} (${causeCode ?? 'connection failed'}).`));
             console.error(chalk.gray('  Check SCRAPELY_API_BASE_URL / SCRAPELY_API_URL, or that the server is running.'));
         } else {
-            console.error(chalk.red(`\n✗ Login failed: ${message}`));
+            console.error(chalk.red(`\n✗ Login failed: ${terminalSafeText(message)}`));
         }
         process.exit(1);
     }

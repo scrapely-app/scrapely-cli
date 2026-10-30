@@ -1,6 +1,7 @@
 import chalk from 'chalk';
 import { Command } from 'commander';
 import { getTemplates } from './create.js';
+import { terminalJson, terminalSafeLine } from '../utils/terminal.js';
 
 /**
  * templates command - Explore the actor templates available for `scrapely create`
@@ -19,7 +20,7 @@ export function setupTemplatesCommand(program: Command): void {
             // to the bundled snapshot when the API is unreachable.
             const available = await getTemplates();
             if (options.json) {
-                console.log(JSON.stringify(
+                console.log(terminalJson(JSON.stringify(
                     available.map(({ name, aliases, displayName, description, language, useCases }) => ({
                         name,
                         aliases,
@@ -30,14 +31,16 @@ export function setupTemplatesCommand(program: Command): void {
                     })),
                     null,
                     2,
-                ));
+                )));
                 return;
             }
 
             console.log(chalk.bold('\nAvailable actor templates:\n'));
+            // Catalog text comes from the API: control characters are removed before printing.
             for (const template of available) {
-                console.log(`  ${chalk.cyan(template.name)}  ${chalk.gray(`(${template.language})`)}  ${chalk.gray(`[${template.useCases.join(', ')}]`)}`);
-                console.log(chalk.gray(`    ${template.displayName} - ${template.description}`));
+                const useCases = template.useCases.map(terminalSafeLine).join(', ');
+                console.log(`  ${chalk.cyan(terminalSafeLine(template.name))}  ${chalk.gray(`(${terminalSafeLine(template.language)})`)}  ${chalk.gray(`[${useCases}]`)}`);
+                console.log(chalk.gray(`    ${terminalSafeLine(template.displayName)} - ${terminalSafeLine(template.description)}`));
             }
             console.log(chalk.gray('\nUse with: scrapely create my-actor --template <name>'));
         });

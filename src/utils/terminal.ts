@@ -19,6 +19,11 @@ export function terminalSafeLine(value: unknown): string {
     return terminalSafeText(value).replace(/[\n\t]/g, ' ');
 }
 
+/** Error messages (often from the API) printed to the terminal. */
+export function terminalSafeError(err: unknown): string {
+    return terminalSafeText(err instanceof Error ? err.message : err);
+}
+
 /**
  * Remote text printed to stdout (run and build logs, `scrapely api` bodies).
  * On a terminal it goes through terminalSafeText; piped or redirected output

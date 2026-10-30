@@ -11,7 +11,7 @@ import { pullCommand } from './pull.js';
 import { pushCommand } from './push.js';
 import { buildCreateCommand } from './builds.js';
 import { resolveRemoteInput } from '../utils/inputResolution.js';
-import { terminalSafeLine as line, terminalSafeText, stdoutSafeText } from '../utils/terminal.js';
+import { terminalSafeLine as line, terminalSafeText, stdoutSafeText, terminalJson } from '../utils/terminal.js';
 
 /**
  * actors ls - List actors
@@ -28,7 +28,7 @@ export async function listActorsCommand(options?: { my?: boolean; limit?: number
         });
 
         if (options?.json) {
-            console.log(JSON.stringify(result, null, 2));
+            console.log(terminalJson(JSON.stringify(result, null, 2)));
             return;
         }
 
@@ -43,7 +43,7 @@ export async function listActorsCommand(options?: { my?: boolean; limit?: number
         }
     } catch (err) {
         console.error(chalk.red('Error: Failed to list actors.'));
-        console.error(chalk.gray(`Details: ${(err as Error).message}`));
+        console.error(chalk.gray(`Details: ${line((err as Error).message)}`));
         process.exit(1);
     }
 }
@@ -74,7 +74,7 @@ export async function actorsSearchCommand(query?: string, options?: { category?:
         });
 
         if (options?.json) {
-            console.log(JSON.stringify(result, null, 2));
+            console.log(terminalJson(JSON.stringify(result, null, 2)));
             return;
         }
 
@@ -92,11 +92,11 @@ export async function actorsSearchCommand(query?: string, options?: { category?:
                 const desc = safe.length > 100 ? `${safe.substring(0, 100)}...` : safe;
                 console.log(chalk.gray(`    ${desc}`));
             }
-            console.log(chalk.gray(`    Users (30d): ${stats?.totalUsers30Days ?? 0} | Pricing: ${pricingModelLabels[pricingModel ?? ''] ?? pricingModel ?? 'Unknown'}`));
+            console.log(chalk.gray(`    Users (30d): ${stats?.totalUsers30Days ?? 0} | Pricing: ${line(pricingModelLabels[pricingModel ?? ''] ?? pricingModel ?? 'Unknown')}`));
         }
     } catch (err) {
         console.error(chalk.red('Error: Failed to search actors.'));
-        console.error(chalk.gray(`Details: ${(err as Error).message}`));
+        console.error(chalk.gray(`Details: ${line((err as Error).message)}`));
         process.exit(1);
     }
 }
@@ -134,7 +134,7 @@ export async function actorsRmCommand(actorId: string, options?: { yes?: boolean
         console.log(chalk.green(`✓ Actor ${actorId} deleted successfully`));
     } catch (err) {
         console.error(chalk.red('Error: Failed to delete actor.'));
-        console.error(chalk.gray(`Details: ${(err as Error).message}`));
+        console.error(chalk.gray(`Details: ${line((err as Error).message)}`));
         process.exit(1);
     }
 }
@@ -165,7 +165,7 @@ export async function actorInfoCommand(actorId: string, options?: { input?: bool
         if (options?.input) {
             const inputSchema = definition?.input ?? definition?.inputSchema;
             if (inputSchema) {
-                console.log(JSON.stringify(inputSchema, null, 2));
+                console.log(terminalJson(JSON.stringify(inputSchema, null, 2)));
             } else {
                 console.log(chalk.gray('No input schema found for this actor.'));
             }
@@ -184,7 +184,7 @@ export async function actorInfoCommand(actorId: string, options?: { input?: bool
         }
 
         if (options?.json) {
-            console.log(JSON.stringify(actor, null, 2));
+            console.log(terminalJson(JSON.stringify(actor, null, 2)));
             return;
         }
 
@@ -199,7 +199,7 @@ export async function actorInfoCommand(actorId: string, options?: { input?: bool
         }
     } catch (err) {
         console.error(chalk.red('Error: Failed to get actor info.'));
-        console.error(chalk.gray(`Details: ${(err as Error).message}`));
+        console.error(chalk.gray(`Details: ${line((err as Error).message)}`));
         process.exit(1);
     }
 }
@@ -292,7 +292,7 @@ export async function actorCallCommand(actorId?: string, options?: {
         }
 
         if (jsonMode) {
-            console.log(JSON.stringify({ data: finalRun }, null, 2));
+            console.log(terminalJson(JSON.stringify({ data: finalRun }, null, 2)));
             if (runStatus !== 'SUCCEEDED') {
                 process.exit(1);
             }
@@ -305,7 +305,7 @@ export async function actorCallCommand(actorId?: string, options?: {
             if (options?.outputDataset && finalRun.defaultDatasetId) {
                 try {
                     const { items } = await getLoggedClientOrThrow().dataset(finalRun.defaultDatasetId).listItems();
-                    console.log(JSON.stringify(items, null, 2));
+                    console.log(terminalJson(JSON.stringify(items, null, 2)));
                 } catch {
                     console.log(chalk.gray(`Dataset ID: ${finalRun.defaultDatasetId}`));
                 }
@@ -316,7 +316,7 @@ export async function actorCallCommand(actorId?: string, options?: {
         }
     } catch (err) {
         console.error(chalk.red('Error: Failed to run actor.'));
-        console.error(chalk.gray(`Details: ${(err as Error).message}`));
+        console.error(chalk.gray(`Details: ${line((err as Error).message)}`));
         process.exit(1);
     }
 }
@@ -347,7 +347,7 @@ export async function actorStartCommand(actorId: string | undefined, options?: {
         });
 
         if (options?.json) {
-            console.log(JSON.stringify({ data: run }, null, 2));
+            console.log(terminalJson(JSON.stringify({ data: run }, null, 2)));
             return;
         }
         
@@ -355,7 +355,7 @@ export async function actorStartCommand(actorId: string | undefined, options?: {
         console.log(chalk.gray(`Status: ${run.status}`));
     } catch (err) {
         console.error(chalk.red('Error: Failed to start actor.'));
-        console.error(chalk.gray(`Details: ${(err as Error).message}`));
+        console.error(chalk.gray(`Details: ${line((err as Error).message)}`));
         process.exit(1);
     }
 }

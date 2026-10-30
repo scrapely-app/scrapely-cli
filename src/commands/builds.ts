@@ -7,7 +7,7 @@ import { Command } from 'commander';
 import inquirer from 'inquirer';
 import { getLocalConfig, getActorConfig } from '../config.js';
 import { getLoggedClientOrThrow } from '../client.js';
-import { stdoutSafeText, terminalJson } from '../utils/terminal.js';
+import { stdoutSafeText, terminalJson, terminalSafeError } from '../utils/terminal.js';
 
 /**
  * builds add-tag - Add a tag to a build
@@ -64,7 +64,7 @@ export async function buildAddTagCommand(options: { build: string; tag: string }
         console.log(chalk.green(`✓ Tag "${options.tag}" added to build ${options.build}${previousBuildInfo}`));
     } catch (err) {
         console.error(chalk.red(`Error: Failed to add tag "${options.tag}" to build "${options.build}".`));
-        console.error(chalk.gray(`Details: ${(err as Error).message}`));
+        console.error(chalk.gray(`Details: ${terminalSafeError(err)}`));
         process.exit(1);
     }
 }
@@ -138,7 +138,7 @@ export async function buildRemoveTagCommand(options: { build: string; tag: strin
         console.log(chalk.green(`✓ Tag "${options.tag}" removed from build ${options.build}`));
     } catch (err) {
         console.error(chalk.red(`Error: Failed to remove tag "${options.tag}" from build "${options.build}".`));
-        console.error(chalk.gray(`Details: ${(err as Error).message}`));
+        console.error(chalk.gray(`Details: ${terminalSafeError(err)}`));
         process.exit(1);
     }
 }
@@ -174,7 +174,7 @@ export async function buildRmCommand(buildId: string, options?: { yes?: boolean 
         console.log(chalk.green(`✓ Build ${buildId} deleted successfully`));
     } catch (err) {
         console.error(chalk.red('Error: Failed to delete build.'));
-        console.error(chalk.gray(`Details: ${(err as Error).message}`));
+        console.error(chalk.gray(`Details: ${terminalSafeError(err)}`));
         process.exit(1);
     }
 }
@@ -224,7 +224,7 @@ export async function listBuildsCommand(options?: { actorId?: string; limit?: nu
         }
     } catch (err) {
         console.error(chalk.red('Error: Failed to list builds.'));
-        console.error(chalk.gray(`Details: ${(err as Error).message}`));
+        console.error(chalk.gray(`Details: ${terminalSafeError(err)}`));
         process.exit(1);
     }
 }
@@ -274,7 +274,7 @@ export async function buildInfoCommand(buildId: string, options?: { json?: boole
         }
     } catch (err) {
         console.error(chalk.red('Error: Failed to get build info.'));
-        console.error(chalk.gray(`Details: ${(err as Error).message}`));
+        console.error(chalk.gray(`Details: ${terminalSafeError(err)}`));
         process.exit(1);
     }
 }
@@ -293,7 +293,7 @@ export async function buildLogCommand(buildId: string): Promise<void> {
         console.log(typeof log === 'string' ? stdoutSafeText(log) : terminalJson(JSON.stringify(log)));
     } catch (err) {
         console.error(chalk.red('Error: Failed to get build log.'));
-        console.error(chalk.gray(`Details: ${(err as Error).message}`));
+        console.error(chalk.gray(`Details: ${terminalSafeError(err)}`));
         process.exit(1);
     }
 }
@@ -365,7 +365,7 @@ export async function buildWaitCommand(buildId: string, options?: { timeout?: nu
         return finalStatus;
     } catch (err) {
         console.error(chalk.red('Error: Failed to wait for build.'));
-        console.error(chalk.gray(`Details: ${(err as Error).message}`));
+        console.error(chalk.gray(`Details: ${terminalSafeError(err)}`));
         process.exit(1);
     }
 }
@@ -425,7 +425,7 @@ export async function buildCreateCommand(options?: { actorId?: string; version?:
         }
     } catch (err) {
         console.error(chalk.red('Error: Failed to create build.'));
-        console.error(chalk.gray(`Details: ${(err as Error).message}`));
+        console.error(chalk.gray(`Details: ${terminalSafeError(err)}`));
         process.exit(1);
     }
 }

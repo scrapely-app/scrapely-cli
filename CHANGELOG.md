@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.18] - 2026-10-30
+
+Security release.
+
+- Text from the API or from a project is no longer printed to the terminal with escape or other control characters: error details of every command, `datasets get-items`, `key-value-stores get-value` (on a terminal; piped output keeps its exact bytes), JSON output of `actors` commands, `templates` catalog text, and the actor ID, version, build ID and file names printed by `push`.
+- The API URL must be `https://` (plain `http://` only for localhost). Before, a login token or OAuth code could be sent to a plain-HTTP API host.
+- `pull` clones only over `https://` and `ssh://` (no `http://`, `git://` or other git transports, also not through redirects or submodules); credentials in a clone URL go to git as a header and are not saved in the clone's origin URL.
+- `create`, `push`, `pull`, `init` and local runs no longer read or write files through symbolic links that point outside the project (`package.json`, `scrapely.json`, `.gitignore`, `.actorignore`, `storage/.../INPUT.json`, pushed files).
+- `create` from a user-picked repository no longer runs `npm install` (which runs the repository's scripts); it asks you to review the code first.
+- `scrapely run` (local) no longer passes a `SCRAPELY_TOKEN` or proxy password from your shell to the actor; set them in the actor's environment variables if needed.
+- `scrapely mcp`: the saved login token is only used with the API it was saved for.
+- `upgrade` installs exactly the checked version and with `--ignore-scripts`.
+- Dependencies: scrapely-client 2.25.11, @inquirer/external-editor 3.0.3, basic-ftp and follow-redirects updated.
+
 ## [0.1.17] - 2026-10-24
 
 - `-v` / `--version` prints the CLI version only before a command (`scrapely -v`). After a command it belongs to that command again: `push -v`, `actors push -v`, `pull -v`, `actors pull -v`, `builds create --version`, `actors build --version` and `upgrade --version` get their version, and `runs info -v` is verbose. Before, all of them printed the CLI version and exited 0 without doing anything.

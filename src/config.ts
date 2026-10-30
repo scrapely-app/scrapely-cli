@@ -1,6 +1,8 @@
 import { homedir } from 'os';
-import { dirname, join, resolve } from 'path';
+import { dirname, join, relative, resolve } from 'path';
 import { chmodSync, existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs';
+import { readFileNoFollowWithin, writeFileNoFollowWithin } from './utils/pathValidation.js';
+import { terminalSafeLine } from './utils/terminal.js';
 
 
 export const SCRAPELY_DIR = join(homedir(), '.scrapely');
@@ -250,9 +252,11 @@ export function getActorConfig(cwd: string): ActorConfig | null {
  * only when no config exists.
  */
 export function updateActorConfig(cwd: string, patch: Partial<ActorConfig> & Record<string, unknown>): void {
+    // Never through a symlink: a cloned repo could link the config to a file outside the project
+    const base = resolve(cwd);
     const found = findActorConfig(cwd);
     if (!found) {
-        writeFileSync(join(resolve(cwd), 'scrapely.json'), JSON.stringify(patch, null, 2) + '\n');
+        writeFileNoFollowWithin(base, 'scrapely.json', JSON.stringify(patch, null, 2) + '\n');
         return;
     }
 
@@ -265,11 +269,12 @@ export function updateActorConfig(cwd: string, patch: Partial<ActorConfig> & Rec
     }
 
     for (const [path, fields] of byFile) {
-        const raw = readFileSync(path, 'utf-8');
+        const rel = relative(base, path);
+        const raw = readFileNoFollowWithin(base, rel).toString('utf-8');
         const current = readJsonObject(path) ?? {};
         // Keep the file's existing indentation (templates use 4 spaces)
         const indent = /^\{\s*\n( +)"/.exec(raw)?.[1]?.length ?? 2;
-        writeFileSync(path, JSON.stringify({ ...current, ...fields }, null, indent) + (raw.endsWith('\n') ? '\n' : ''));
+        writeFileNoFollowWithin(base, rel, JSON.stringify({ ...current, ...fields }, null, indent) + (raw.endsWith('\n') ? '\n' : ''));
     }
 }
 
@@ -326,11 +331,30 @@ export function getLocalConfig(cwd: string): ScrapelyConfig | null {
  *   1. SCRAPELY_API_BASE_URL env var (documented in the agent skill)
  *   2. SCRAPELY_API_URL env var
  *   3. API URL saved with the login credentials
- *   4. Default (local development server)
+ *   4. Default: https://api.scrape.ly (production)
  */
 export function getApiBaseUrl(): string {
     const creds = getCredentials();
-    return process.env.SCRAPELY_API_BASE_URL || process.env.SCRAPELY_API_URL || creds?.apiBaseUrl || DEFAULT_API_URL;
+    return assertSecureApiBaseUrl(process.env.SCRAPELY_API_BASE_URL || process.env.SCRAPELY_API_URL || creds?.apiBaseUrl || DEFAULT_API_URL);
+}
+
+const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]']);
+
+/**
+ * The API base receives the OAuth exchange and the bearer token, so it must be
+ * https://. Plain http:// is only allowed for loopback (local development).
+ * Returns the URL unchanged, or throws before any request is made.
+ */
+export function assertSecureApiBaseUrl(url: string): string {
+    let parsed: URL;
+    try {
+        parsed = new URL(url);
+    } catch {
+        throw new Error(`Invalid Scrapely API URL: ${url}`);
+    }
+    if (parsed.protocol === 'https:') return url;
+    if (parsed.protocol === 'http:' && LOOPBACK_HOSTS.has(parsed.hostname)) return url;
+    throw new Error(`Refusing to use ${url}: the Scrapely API must use https:// (http:// is only allowed for localhost).`);
 }
 
 /**
@@ -385,7 +409,7 @@ export function resolveSecrets(envVars: Record<string, string>): Record<string, 
             if (secret) {
                 resolved[key] = secret.value;
             } else {
-                console.warn(`Warning: Secret "${secretName}" not found for environment variable "${key}"`);
+                console.warn(`Warning: Secret "${terminalSafeLine(secretName)}" not found for environment variable "${terminalSafeLine(key)}"`);
                 resolved[key] = value;
             }
         } else {

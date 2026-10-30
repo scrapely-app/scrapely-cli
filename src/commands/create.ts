@@ -5,9 +5,9 @@
 import inquirer from 'inquirer';
 import chalk from 'chalk';
 import { Command } from 'commander';
-import { existsSync, writeFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, cpSync, renameSync } from 'fs';
+import { existsSync, mkdirSync, mkdtempSync, rmSync, cpSync, renameSync, lstatSync } from 'fs';
 import { join } from 'path';
-import { safeResolve, validateFilename } from '../utils/pathValidation.js';
+import { safeResolve, validateFilename, readFileNoFollowWithin, writeFileNoFollowWithin } from '../utils/pathValidation.js';
 import { getToken, getApiBaseUrl, findActorConfig, getActorConfig, updateActorConfig, ACTOR_CONFIG_FILES } from '../config.js';
 import { getLoggedClientOrThrow } from '../client.js';
 import { ActorSourceType as PlatformActorSourceType } from 'scrapely-client';
@@ -15,6 +15,7 @@ import { tmpdir } from 'os';
 
 import { execFile } from 'child_process';
 import { promisify } from 'util';
+import { terminalSafeError } from '../utils/terminal.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -400,16 +401,15 @@ export function filterTemplatesByChoice(
  * Update package.json with the actor name
  */
 function updatePackageJson(targetDir: string, actorName: string): void {
-    const packageJsonPath = join(targetDir, 'package.json');
-    if (existsSync(packageJsonPath)) {
-        try {
-            const content = readFileSync(packageJsonPath, 'utf-8');
-            const packageJson = JSON.parse(content);
-            packageJson.name = actorName;
-            writeFileSync(packageJsonPath, JSON.stringify(packageJson, null, 2) + '\n');
-        } catch {
-            // If parsing fails, leave as-is
-        }
+    // Never through a symlink: a cloned template/repo could ship package.json
+    // as a link to a file outside the project
+    try {
+        const content = readFileNoFollowWithin(targetDir, 'package.json').toString('utf-8');
+        const packageJson = JSON.parse(content);
+        packageJson.name = actorName;
+        writeFileNoFollowWithin(targetDir, 'package.json', JSON.stringify(packageJson, null, 2) + '\n');
+    } catch {
+        // Missing, a symlink, or parsing fails — leave as-is
     }
 }
 
@@ -421,12 +421,30 @@ function updatePythonModule(targetDir: string, actorName: string): void {
     const myActorPath = join(targetDir, 'my_actor');
     const newActorPath = join(targetDir, actorName.replace(/-/g, '_'));
     
-    if (existsSync(myActorPath) && myActorPath !== newActorPath) {
+    let isRealDir = false;
+    try {
+        isRealDir = lstatSync(myActorPath).isDirectory();
+    } catch {
+        // Missing
+    }
+    if (isRealDir && myActorPath !== newActorPath) {
         try {
             renameSync(myActorPath, newActorPath);
         } catch {
             // If rename fails, leave as-is
         }
+    }
+}
+
+/**
+ * Write a default ignore file. existsSync is false for a dangling symlink, so
+ * the write itself must refuse to follow links (it would create the target).
+ */
+function writeIgnoreFile(targetDir: string, name: string, content: string): void {
+    try {
+        writeFileNoFollowWithin(targetDir, name, content);
+    } catch {
+        // A symlink at that name — leave it alone
     }
 }
 
@@ -438,18 +456,26 @@ function updatePythonModule(targetDir: string, actorName: string): void {
  */
 function createScrapelyJson(targetDir: string, actorName: string): void {
     if (findActorConfig(targetDir)) {
-        updateActorConfig(targetDir, { name: actorName });
+        try {
+            updateActorConfig(targetDir, { name: actorName });
+        } catch {
+            // A symlinked config (from a cloned repo) — never write through it
+        }
         return;
     }
     // A config that exists but does not parse is left as-is
     if (ACTOR_CONFIG_FILES.some((rel) => existsSync(join(targetDir, ...rel.split('/'))))) return;
 
-    writeFileSync(join(targetDir, 'scrapely.json'), JSON.stringify({
-        actorSpecification: 1,
-        name: actorName,
-        version: '0.0',
-        buildTag: 'latest',
-    }, null, 2) + '\n');
+    try {
+        writeFileNoFollowWithin(targetDir, 'scrapely.json', JSON.stringify({
+            actorSpecification: 1,
+            name: actorName,
+            version: '0.0',
+            buildTag: 'latest',
+        }, null, 2) + '\n');
+    } catch {
+        // A (dangling) symlink at scrapely.json — never write through it
+    }
 }
 
 /**
@@ -488,6 +514,8 @@ async function downloadTemplateFromGitHub(source: TemplateDownloadSource, target
         cpSync(sourceDir, targetDir, {
             recursive: true,
             filter: (src: string) => {
+                // Never copy symlinks: later setup writes would follow them out of the project
+                if (lstatSync(src).isSymbolicLink()) return false;
                 const basename = src.split(/[/\\]/).pop();
                 // .github is excluded — templates must not ship CI workflows;
                 // Actor rebuilds are webhook-driven, not GitHub Actions.
@@ -736,7 +764,7 @@ async function setupAutoBuild(
             const build = await client.actor(actor.id).build(versionNumber, { tag: 'latest', waitForFinish: 0 });
             console.log(chalk.green(`  ✓ Initial build started: ${build.id}`));
         } catch (err) {
-            console.log(chalk.yellow(`  Warning: Could not start the initial build (${(err as Error).message}). Run \`scrapely builds create\` later.`));
+            console.log(chalk.yellow(`  Warning: Could not start the initial build (${terminalSafeError(err)}). Run \`scrapely builds create\` later.`));
         }
 
         // 3. Register the CI webhook on the repository (auto-rebuild on push)
@@ -762,7 +790,7 @@ async function setupAutoBuild(
             }
         }
     } catch (err) {
-        console.log(chalk.yellow(`Warning: Could not create the platform Actor (${(err as Error).message}).`));
+        console.log(chalk.yellow(`Warning: Could not create the platform Actor (${terminalSafeError(err)}).`));
         console.log(chalk.gray('  Create it later with `scrapely push`, then register the webhook from the Actor\'s CI/CD settings.'));
         return { ok: false, webhookRegistered: false, error: (err as Error).message };
     }
@@ -867,7 +895,7 @@ export async function createCommand(actorName?: string, options?: { template?: s
     try {
         validateFilename(actorName!);
     } catch (err) {
-        console.error(chalk.red(`Error: Invalid actor name: ${(err as Error).message}`));
+        console.error(chalk.red(`Error: Invalid actor name: ${terminalSafeError(err)}`));
         process.exit(1);
     }
 
@@ -876,7 +904,7 @@ export async function createCommand(actorName?: string, options?: { template?: s
     try {
         targetDir = actorName ? safeResolve(cwd, actorName) : cwd;
     } catch (err) {
-        console.error(chalk.red(`Error: Invalid target directory: ${(err as Error).message}`));
+        console.error(chalk.red(`Error: Invalid target directory: ${terminalSafeError(err)}`));
         process.exit(1);
     }
 
@@ -1060,8 +1088,23 @@ export async function createCommand(actorName?: string, options?: { template?: s
     }
 
     // Create directory
+    // Non-recursive mkdir fails atomically if anything (incl. a symlink) appeared
+    // at targetDir since the existence check above; then confirm it is a real dir
     if (actorName !== '.') {
-        mkdirSync(targetDir, { recursive: true });
+        try {
+            mkdirSync(targetDir);
+        } catch (err) {
+            if ((err as NodeJS.ErrnoException).code === 'EEXIST') {
+                console.error(chalk.red(`Error: Directory "${actorName}" already exists.`));
+                process.exit(1);
+            }
+            throw err;
+        }
+        const st = lstatSync(targetDir);
+        if (st.isSymbolicLink() || !st.isDirectory()) {
+            console.error(chalk.red(`Error: Directory "${actorName}" is not a regular directory.`));
+            process.exit(1);
+        }
     }
 
     console.log(chalk.gray(`Creating actor "${actorName}" from template "${template.name}"...`));
@@ -1080,7 +1123,7 @@ export async function createCommand(actorName?: string, options?: { template?: s
             await downloadTemplateFromGitHub({ kind: 'repo', url: template.repoUrl }, targetDir);
         }
     } catch (err) {
-        console.error(chalk.red(`Error downloading template: ${(err as Error).message}`));
+        console.error(chalk.red(`Error downloading template: ${terminalSafeError(err)}`));
         console.log(chalk.gray('Make sure you have git installed and internet access.'));
         process.exit(1);
     }
@@ -1105,7 +1148,7 @@ export async function createCommand(actorName?: string, options?: { template?: s
     // Create .gitignore
     const gitignorePath = join(targetDir, '.gitignore');
     if (!existsSync(gitignorePath)) {
-        writeFileSync(gitignorePath, `node_modules/
+        writeIgnoreFile(targetDir, '.gitignore', `node_modules/
 storage/
 dist/
 .env
@@ -1120,7 +1163,7 @@ venv/
     // Create .actorignore
     const actorignorePath = join(targetDir, '.actorignore');
     if (!existsSync(actorignorePath)) {
-        writeFileSync(actorignorePath, `# Files to exclude from actor push
+        writeIgnoreFile(targetDir, '.actorignore', `# Files to exclude from actor push
 node_modules/
 .git/
 storage/
@@ -1211,15 +1254,21 @@ venv/
         return;
     }
 
-    // Install dependencies
+    // Install dependencies. npm install runs the project's lifecycle scripts, so only do it for
+    // our own templates; a user-picked repository is left for the user to review first.
+    const fromOwnTemplate = !cloningExistingRepo && Boolean(template.folder);
     if (!options?.skipDependencyInstall && (template.language === 'javascript' || template.language === 'typescript')) {
-        try {
-            console.log(chalk.gray('\nInstalling dependencies...'));
-            const npmInstallArgs = options?.omitOptionalDeps ? ['install', '--omit=optional'] : ['install'];
-            await execFileAsync('npm', npmInstallArgs, { cwd: targetDir });
-            console.log(chalk.green('✓ Dependencies installed'));
-        } catch (err) {
-            console.log(chalk.yellow('Warning: Could not install dependencies. Run `npm install` manually.'));
+        if (!fromOwnTemplate) {
+            console.log(chalk.yellow('\nSkipped installing dependencies: review the code first, then run `npm install`.'));
+        } else {
+            try {
+                console.log(chalk.gray('\nInstalling dependencies...'));
+                const npmInstallArgs = options?.omitOptionalDeps ? ['install', '--omit=optional'] : ['install'];
+                await execFileAsync('npm', npmInstallArgs, { cwd: targetDir });
+                console.log(chalk.green('✓ Dependencies installed'));
+            } catch (err) {
+                console.log(chalk.yellow('Warning: Could not install dependencies. Run `npm install` manually.'));
+            }
         }
     }
 

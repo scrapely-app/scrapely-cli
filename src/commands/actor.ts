@@ -8,6 +8,7 @@ import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs';
 import { getToken } from '../config.js';
 import { getRuntimeClient } from '../client.js';
 import { safeResolve, validatePathWithinDir } from '../utils/pathValidation.js';
+import { terminalSafeError } from '../utils/terminal.js';
 
 /**
  * Check if a runtime API base URL is being used (from env vars).
@@ -121,7 +122,7 @@ export async function getInputCommand(): Promise<void> {
             console.error(chalk.gray(`No INPUT record found in key-value store "${inputSource.storeId}", falling back to the ACTOR_INPUT environment variable.`));
         } catch (err) {
             console.error(chalk.yellow(`Warning: Could not fetch the INPUT record from key-value store "${inputSource.storeId}".`));
-            console.error(chalk.gray(`Details: ${(err as Error).message}`));
+            console.error(chalk.gray(`Details: ${terminalSafeError(err)}`));
         }
     }
 
@@ -139,7 +140,7 @@ export async function getInputCommand(): Promise<void> {
         console.log(JSON.stringify(parsed, null, 2));
     } catch (err) {
         console.error(chalk.red('Error: Failed to decode ACTOR_INPUT.'));
-        console.error(chalk.gray(`Details: ${(err as Error).message}`));
+        console.error(chalk.gray(`Details: ${terminalSafeError(err)}`));
         process.exit(1);
     }
 }
@@ -174,7 +175,7 @@ export async function pushDataCommand(item?: string): Promise<void> {
         JSON.parse(inputData);
     } catch (err) {
         console.error(chalk.red('Error: Invalid JSON input.'));
-        console.error(chalk.gray(`Details: ${(err as Error).message}`));
+        console.error(chalk.gray(`Details: ${terminalSafeError(err)}`));
         process.exit(1);
     }
 
@@ -200,7 +201,7 @@ export async function pushDataCommand(item?: string): Promise<void> {
         console.log(chalk.green('✓ Data pushed successfully'));
     } catch (err) {
         console.error(chalk.red('Error: Failed to push data to dataset.'));
-        console.error(chalk.gray(`Details: ${(err as Error).message}`));
+        console.error(chalk.gray(`Details: ${terminalSafeError(err)}`));
         process.exit(1);
     }
 }
@@ -241,7 +242,7 @@ export async function getValueCommand(key: string): Promise<void> {
         }
     } catch (err) {
         console.error(chalk.red(`Error: Key '${key}' not found in key-value store.`));
-        console.error(chalk.gray(`Details: ${(err as Error).message}`));
+        console.error(chalk.gray(`Details: ${terminalSafeError(err)}`));
         process.exit(1);
     }
 }
@@ -295,7 +296,7 @@ export async function setValueCommand(
         console.log(chalk.green(`✓ Value set for key '${key}'`));
     } catch (err) {
         console.error(chalk.red('Error: Failed to set value in key-value store.'));
-        console.error(chalk.gray(`Details: ${(err as Error).message}`));
+        console.error(chalk.gray(`Details: ${terminalSafeError(err)}`));
         process.exit(1);
     }
 }
@@ -346,7 +347,7 @@ export async function getPublicUrlCommand(key: string, options?: { expiresIn?: n
         console.log(url);
     } catch (err) {
         console.error(chalk.red('Error: Failed to create a public URL.'));
-        console.error(chalk.gray(`Details: ${(err as Error).message}`));
+        console.error(chalk.gray(`Details: ${terminalSafeError(err)}`));
         process.exit(1);
     }
 }
@@ -412,7 +413,7 @@ export async function chargeCommand(
         if (endedNow) {
             console.error(chalk.gray(`Run ${runId} has finished (status ${endedNow}). Charges are only accepted while the run is RUNNING.`));
         }
-        console.error(chalk.gray(`Details: ${(err as Error).message}`));
+        console.error(chalk.gray(`Details: ${terminalSafeError(err)}`));
         process.exit(1);
     }
 }
@@ -633,7 +634,7 @@ export async function generateSchemaTypesCommand(
         try {
             inputSchemaPath = safeResolve(cwd, path);
         } catch (err) {
-            console.error(chalk.red(`Error: Invalid schema path: ${(err as Error).message}`));
+            console.error(chalk.red(`Error: Invalid schema path: ${terminalSafeError(err)}`));
             process.exit(1);
         }
     } else {
@@ -660,7 +661,7 @@ export async function generateSchemaTypesCommand(
         raw = JSON.parse(readFileSync(inputSchemaPath, 'utf-8'));
     } catch (err) {
         console.error(chalk.red(`Error: Failed to parse schema file.`));
-        console.error(chalk.gray(`Details: ${(err as Error).message}`));
+        console.error(chalk.gray(`Details: ${terminalSafeError(err)}`));
         process.exit(1);
     }
 
@@ -668,7 +669,7 @@ export async function generateSchemaTypesCommand(
     try {
         schema = extractInputSchema(raw, inputSchemaPath);
     } catch (err) {
-        console.error(chalk.red(`Error: ${(err as Error).message}`));
+        console.error(chalk.red(`Error: ${terminalSafeError(err)}`));
         process.exit(1);
     }
 
@@ -703,12 +704,12 @@ export async function generateSchemaTypesCommand(
         // Ensure default path is also validated as within cwd
         validatePathWithinDir(outputDir, cwd);
     } catch (err) {
-        console.error(chalk.red(`Error: Invalid output path: ${(err as Error).message}`));
+        console.error(chalk.red(`Error: Invalid output path: ${terminalSafeError(err)}`));
         process.exit(1);
     }
     mkdirSync(outputDir, { recursive: true });
 
-    const header = `/* eslint-disable */\n/**\n * Auto-generated from ${inputSchemaPath}\n * Do not edit manually — run: scrapely actor generate-schema-types\n */\n\n`;
+    const header = `/* eslint-disable */\n/**\n * Auto-generated from ${inputSchemaPath.replace(/\*\//g, '*\\/')}\n * Do not edit manually — run: scrapely actor generate-schema-types\n */\n\n`;
     const body = Array.from(interfaces.values()).filter(Boolean).join('\n');
     const outFile = join(outputDir, 'input.ts');
     writeFileSync(outFile, header + body + `\nexport type { ${rootName} as Input };\n`);

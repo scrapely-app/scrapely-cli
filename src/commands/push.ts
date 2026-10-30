@@ -1,15 +1,15 @@
 import chalk from 'chalk';
 import { spawn } from 'child_process';
-import { readFileSync, existsSync, readdirSync, statSync, lstatSync } from 'fs';
-import { join, relative, resolve } from 'path';
+import { readdirSync, statSync, lstatSync } from 'fs';
+import { join, relative, resolve, sep } from 'path';
 import ignore from 'ignore';
 import archiver from 'archiver';
 import inquirer from 'inquirer';
 import { getToken, getLocalConfig, getActorConfig, findActorConfig, updateActorConfig, getSecrets, getWebBaseUrl } from '../config.js';
 import { getLoggedClientOrThrow } from '../client.js';
-import { stdoutSafeText, terminalJson } from '../utils/terminal.js';
+import { stdoutSafeText, terminalJson, terminalSafeLine } from '../utils/terminal.js';
 import { ActorSourceType, type ActorVersionSourceFile, type ScrapelyClient } from 'scrapely-client';
-import { safeResolve, isValidPathWithinDir } from '../utils/pathValidation.js';
+import { readFileNoFollowWithin } from '../utils/pathValidation.js';
 
 
 /**
@@ -35,25 +35,12 @@ function collectFiles(dir: string, base: string = dir): { name: string; format: 
         '.scrapely',
     ]);
     
-    // Read .gitignore if it exists (fixed filename under validated dir)
-    const gitignorePath = join(dir, '.gitignore');
-    if (existsSync(gitignorePath) && isValidPathWithinDir('.gitignore', dir)) {
+    // Read .gitignore / .actorignore if they exist (never through a symlink)
+    for (const ignoreFile of ['.gitignore', '.actorignore']) {
         try {
-            const gitignoreContent = readFileSync(gitignorePath, 'utf-8');
-            ig.add(gitignoreContent);
+            ig.add(readFileNoFollowWithin(dir, ignoreFile).toString('utf-8'));
         } catch {
-            // Ignore errors reading .gitignore
-        }
-    }
-    
-    // Read .actorignore if it exists
-    const actorignorePath = join(dir, '.actorignore');
-    if (existsSync(actorignorePath) && isValidPathWithinDir('.actorignore', dir)) {
-        try {
-            const actorignoreContent = readFileSync(actorignorePath, 'utf-8');
-            ig.add(actorignoreContent);
-        } catch {
-            // Ignore errors reading .actorignore
+            // Missing, a symlink, or unreadable — ignore
         }
     }
     
@@ -62,7 +49,8 @@ function collectFiles(dir: string, base: string = dir): { name: string; format: 
     
     function walkDir(currentDir: string) {
         // SECURITY: Do not walk outside the base directory
-        if (!resolve(currentDir).startsWith(resolvedBase)) {
+        const resolvedCurrent = resolve(currentDir);
+        if (resolvedCurrent !== resolvedBase && !resolvedCurrent.startsWith(resolvedBase + sep)) {
             return;
         }
 
@@ -99,18 +87,10 @@ function collectFiles(dir: string, base: string = dir): { name: string; format: 
     const filteredFiles = ig.filter(allFiles);
     
     for (const relPath of filteredFiles) {
-        // SECURITY: Re-validate each relative path before reading
-        let fullPath: string;
+        // SECURITY: Re-validate each path and read it without following symlinks
+        // anywhere in the path (also catches entries swapped to a symlink since the walk)
         try {
-            fullPath = safeResolve(base, relPath);
-        } catch {
-            continue;
-        }
-        try {
-            if (lstatSync(fullPath).isSymbolicLink()) {
-                continue;
-            }
-            const content = readFileSync(fullPath);
+            const content = readFileNoFollowWithin(base, relPath);
             const isBinary = content.includes(0x00);
             
             files.push({
@@ -221,7 +201,7 @@ export async function printBuildLog(client: ScrapelyClient, buildId: string): Pr
         console.log(chalk.gray('\nBuild log:'));
         console.log(typeof log === 'string' ? stdoutSafeText(log) : terminalJson(JSON.stringify(log, null, 2)));
     } catch {
-        console.log(chalk.gray(`  (log unavailable — run \`scrapely builds log ${buildId}\`)`));
+        console.log(chalk.gray(`  (log unavailable — run \`scrapely builds log ${terminalSafeLine(buildId)}\`)`));
     }
 }
 
@@ -236,12 +216,12 @@ function openInBrowser(url: string): void {
     try {
         const child = spawn(opener, args, { stdio: 'ignore', detached: true });
         child.on('error', () => {
-            console.log(chalk.gray(`  Actor details: ${url}`));
+            console.log(chalk.gray(`  Actor details: ${terminalSafeLine(url)}`));
         });
         child.unref();
-        console.log(chalk.gray(`  Opening ${url}`));
+        console.log(chalk.gray(`  Opening ${terminalSafeLine(url)}`));
     } catch {
-        console.log(chalk.gray(`  Actor details: ${url}`));
+        console.log(chalk.gray(`  Actor details: ${terminalSafeLine(url)}`));
     }
 }
 
@@ -320,9 +300,9 @@ export async function pushCommand(options?: {
             const detail = `Missing secrets used by environment variables: ${missing.join(', ')}. `
                 + 'Add them with `scrapely secrets add <name> <value>` or pass --allow-missing-secrets.';
             if (options?.allowMissingSecrets) {
-                console.warn(chalk.yellow(`Warning: ${detail}`));
+                console.warn(chalk.yellow(`Warning: ${terminalSafeLine(detail)}`));
             } else {
-                console.error(chalk.red(`Error: ${detail}`));
+                console.error(chalk.red(`Error: ${terminalSafeLine(detail)}`));
                 process.exit(1);
             }
         }
@@ -330,7 +310,7 @@ export async function pushCommand(options?: {
 
     const version = options?.version || localConfig.version || '0.0.1';
     const buildTag = options?.buildTag || actorConfig?.buildTag || 'latest';
-    log(chalk.gray(`\nCollecting files from ${cwd}...`));
+    log(chalk.gray(`\nCollecting files from ${terminalSafeLine(cwd)}...`));
 
     let sourceFiles = collectFiles(cwd);
     log(chalk.gray(`  Found ${sourceFiles.length} files`));
@@ -341,7 +321,7 @@ export async function pushCommand(options?: {
 
     for (const f of sourceFiles) {
         const size = Buffer.byteLength(f.content, f.format === 'BASE64' ? 'base64' : 'utf-8');
-        log(chalk.gray(`    ${f.name} (${(size / 1024).toFixed(1)}KB)`));
+        log(chalk.gray(`    ${terminalSafeLine(f.name)} (${(size / 1024).toFixed(1)}KB)`));
     }
 
     // projects larger than 3 MB upload as a single ZIP archive
@@ -377,9 +357,9 @@ export async function pushCommand(options?: {
                             // Non-TTY runs (and --json) keep the hard error with
                             // the --force hint, so scripts and CI are unaffected.
                             const proceed = !jsonMode
-                                && await confirmPushAnyway(detail, { isTTY: Boolean(process.stdout.isTTY) });
+                                && await confirmPushAnyway(terminalSafeLine(detail), { isTTY: Boolean(process.stdout.isTTY) });
                             if (!proceed) {
-                                console.error(chalk.red(`Error: ${detail}`));
+                                console.error(chalk.red(`Error: ${terminalSafeLine(detail)}`));
                                 console.error(chalk.gray('Pass --force to push anyway.'));
                                 process.exit(1);
                             }
@@ -387,20 +367,20 @@ export async function pushCommand(options?: {
                         }
                     }
                 }
-                log(chalk.gray(`  Updating actor ${actorId}...`));
+                log(chalk.gray(`  Updating actor ${terminalSafeLine(actorId)}...`));
             } else {
-                log(chalk.gray(`  Actor ${actorId} not found, creating new...`));
+                log(chalk.gray(`  Actor ${terminalSafeLine(actorId)} not found, creating new...`));
                 actorId = undefined;
             }
         } catch (err) {
-            console.error(chalk.red(`Error: Failed to check actor ${actorId}.`));
-            console.error(chalk.gray(`Details: ${(err as Error).message}`));
+            console.error(chalk.red(`Error: Failed to check actor ${terminalSafeLine(actorId)}.`));
+            console.error(chalk.gray(`Details: ${terminalSafeLine((err as Error).message)}`));
             process.exit(1);
         }
     }
 
     if (!actorId) {
-        log(chalk.gray(`  Creating actor "${localConfig.name}"...`));
+        log(chalk.gray(`  Creating actor "${terminalSafeLine(localConfig.name)}"...`));
         try {
             const actor = await client.actors().create({
                 name: localConfig.name,
@@ -414,7 +394,7 @@ export async function pushCommand(options?: {
                 }],
             });
             actorId = actor.id;
-            log(chalk.green(`  ✓ Actor created: ${actorId}`));
+            log(chalk.green(`  ✓ Actor created: ${terminalSafeLine(actorId)}`));
 
             // Save actorId into the existing actor config (never rewrite or shadow it)
             updateActorConfig(cwd, findActorConfig(cwd)
@@ -422,7 +402,7 @@ export async function pushCommand(options?: {
                 : { actorSpecification: 1, name: localConfig.name, version, actorId });
         } catch (err) {
             console.error(chalk.red('Error: Failed to create actor.'));
-            console.error(chalk.gray(`Details: ${(err as Error).message}`));
+            console.error(chalk.gray(`Details: ${terminalSafeLine((err as Error).message)}`));
             process.exit(1);
         }
     } else {
@@ -433,10 +413,10 @@ export async function pushCommand(options?: {
                 buildTag,
                 sourceFiles: sourceFiles as ActorVersionSourceFile[],
             });
-            log(chalk.green(`  ✓ Version ${version} pushed`));
+            log(chalk.green(`  ✓ Version ${terminalSafeLine(version)} pushed`));
         } catch (err) {
-            console.error(chalk.red(`Error: Failed to push version ${version}.`));
-            console.error(chalk.gray(`Details: ${(err as Error).message}`));
+            console.error(chalk.red(`Error: Failed to push version ${terminalSafeLine(version)}.`));
+            console.error(chalk.gray(`Details: ${terminalSafeLine((err as Error).message)}`));
             process.exit(1);
         }
     }
@@ -446,16 +426,16 @@ export async function pushCommand(options?: {
     // actor unusable (builds by default).
     let build: { id: string; status: string };
     try {
-        log(chalk.gray(`\nBuilding version ${version} (tag: ${buildTag})...`));
+        log(chalk.gray(`\nBuilding version ${terminalSafeLine(version)} (tag: ${terminalSafeLine(buildTag)})...`));
         build = await client.actor(actorId).build(version, {
             tag: buildTag,
             useCache: false,
             waitForFinish: 0,
         });
-        log(chalk.green(`  ✓ Build started: ${build.id}`));
+        log(chalk.green(`  ✓ Build started: ${terminalSafeLine(build.id)}`));
     } catch (err) {
         console.error(chalk.red('Error: Failed to start build.'));
-        console.error(chalk.gray(`Details: ${(err as Error).message}`));
+        console.error(chalk.gray(`Details: ${terminalSafeLine((err as Error).message)}`));
         process.exit(1);
     }
 
@@ -464,37 +444,37 @@ export async function pushCommand(options?: {
     // the flag without a value) waits indefinitely. The exit code reflects
     // the build outcome only.
     if (options?.waitForFinish === 0) {
-        log(chalk.gray(`  Poll with: scrapely builds wait ${build.id}`));
+        log(chalk.gray(`  Poll with: scrapely builds wait ${terminalSafeLine(build.id)}`));
     } else {
         try {
-            log(chalk.gray(`Waiting for build ${build.id}...`));
+            log(chalk.gray(`Waiting for build ${terminalSafeLine(build.id)}...`));
             const finished = await waitForBuild(client, build.id, options?.waitForFinish);
             if (!finished) {
                 // Wait elapsed with the build still running — outcome unknown,
                 // exit 0 (CLI parity).
-                log(chalk.gray(`  Build ${build.id} is still running (wait elapsed).`));
-                log(chalk.gray(`  Check its status with: scrapely builds wait ${build.id}`));
+                log(chalk.gray(`  Build ${terminalSafeLine(build.id)} is still running (wait elapsed).`));
+                log(chalk.gray(`  Check its status with: scrapely builds wait ${terminalSafeLine(build.id)}`));
             } else if (finished.status === 'SUCCEEDED') {
-                log(chalk.green(`✓ Build ${build.id} succeeded`));
+                log(chalk.green(`✓ Build ${terminalSafeLine(build.id)} succeeded`));
             } else {
                 if (jsonMode) {
                     // Machine-readable failure on stderr; exit code carries the failure
-                    console.error(JSON.stringify({
+                    console.error(terminalJson(JSON.stringify({
                         error: `Build ${build.id} ${finished.status}`,
                         actorId,
                         version,
                         buildId: build.id,
                         buildStatus: finished.status,
-                    }));
+                    }), process.stderr.isTTY === true));
                 } else {
-                    console.log(chalk.red(`✗ Build ${build.id} ${finished.status}`));
+                    console.log(chalk.red(`✗ Build ${terminalSafeLine(build.id)} ${terminalSafeLine(finished.status)}`));
                     await printBuildLog(client, build.id);
                 }
                 process.exit(1);
             }
         } catch (err) {
-            console.error(chalk.red(`Error: Failed waiting for build ${build.id}.`));
-            console.error(chalk.gray(`Details: ${(err as Error).message}`));
+            console.error(chalk.red(`Error: Failed waiting for build ${terminalSafeLine(build.id)}.`));
+            console.error(chalk.gray(`Details: ${terminalSafeLine((err as Error).message)}`));
             process.exit(1);
         }
     }
@@ -511,18 +491,18 @@ export async function pushCommand(options?: {
     }
 
     if (jsonMode) {
-        console.log(JSON.stringify({
+        console.log(terminalJson(JSON.stringify({
             actorId,
             version,
             buildTag,
             buildId: build.id,
             buildStatus: finalStatus ?? build.status,
-        }, null, 2));
+        }, null, 2)));
     } else {
         console.log(chalk.green(`\n✓ Push complete`));
-        console.log(chalk.gray(`  Actor: ${actorId}`));
-        console.log(chalk.gray(`  Version: ${version}`));
-        console.log(chalk.gray(`\n  Run with: scrapely call ${actorId}`));
+        console.log(chalk.gray(`  Actor: ${terminalSafeLine(actorId)}`));
+        console.log(chalk.gray(`  Version: ${terminalSafeLine(version)}`));
+        console.log(chalk.gray(`\n  Run with: scrapely call ${terminalSafeLine(actorId)}`));
     }
 
     // --open: open the actor details page in the browser (best effort)

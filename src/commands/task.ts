@@ -5,6 +5,7 @@ import { Command } from 'commander';
 import { getWebBaseUrl } from '../config.js';
 import { getLoggedClientOrThrow } from '../client.js';
 import { resolveRemoteInput } from '../utils/inputResolution.js';
+import { terminalSafeError } from '../utils/terminal.js';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -62,7 +63,7 @@ export async function taskRunCommand(taskId: string, options?: { build?: string;
         }
     } catch (err) {
         console.error(chalk.red('Error: Failed to run task.'));
-        console.error(chalk.gray(`Details: ${(err as Error).message}`));
+        console.error(chalk.gray(`Details: ${terminalSafeError(err)}`));
         process.exit(1);
     }
 }
@@ -92,7 +93,7 @@ export async function taskPublishCommand(taskId: string): Promise<void> {
         }
     } catch (err) {
         console.error(chalk.red('Error: Failed to publish task.'));
-        console.error(chalk.gray(`Details: ${(err as Error).message}`));
+        console.error(chalk.gray(`Details: ${terminalSafeError(err)}`));
         process.exit(1);
     }
 }
@@ -114,7 +115,7 @@ export async function taskUnpublishCommand(taskId: string): Promise<void> {
         console.log(chalk.gray('  SEO settings were kept — republish anytime with scrapely task publish'));
     } catch (err) {
         console.error(chalk.red('Error: Failed to unpublish task.'));
-        console.error(chalk.gray(`Details: ${(err as Error).message}`));
+        console.error(chalk.gray(`Details: ${terminalSafeError(err)}`));
         process.exit(1);
     }
 }

@@ -7,6 +7,7 @@ import { join, relative, resolve } from 'path';
 import { safeResolve, validatePathWithinDir } from '../utils/pathValidation.js';
 import { ACTOR_CONFIG_FILES, findActorConfig } from '../config.js';
 import { formatInputSchemaIssue, validateInputSchemaCategories } from '../utils/inputSchemaCategories.js';
+import { terminalSafeError } from '../utils/terminal.js';
 
 /**
  * Validate a JSON schema
@@ -81,7 +82,7 @@ export async function validateSchemaCommand(schemaPath?: string): Promise<void> 
         try {
             fullPath = safeResolve(cwd, schemaPath);
         } catch (err) {
-            console.error(chalk.red(`Error: Invalid path: ${(err as Error).message}`));
+            console.error(chalk.red(`Error: Invalid path: ${terminalSafeError(err)}`));
             process.exit(1);
         }
         
@@ -97,7 +98,7 @@ export async function validateSchemaCommand(schemaPath?: string): Promise<void> 
             errors.push(...result.errors);
             warnings.push(...result.warnings);
         } catch (err) {
-            console.error(chalk.red(`Error: Failed to parse schema file: ${(err as Error).message}`));
+            console.error(chalk.red(`Error: Failed to parse schema file: ${terminalSafeError(err)}`));
             process.exit(1);
         }
     } else {
@@ -153,7 +154,7 @@ export async function validateSchemaCommand(schemaPath?: string): Promise<void> 
             checkSchema(actorConfig.storages?.keyValueStore, 'storages.keyValueStore');
 
         } catch (err) {
-            console.error(chalk.red(`Error: Failed to parse actor configuration: ${(err as Error).message}`));
+            console.error(chalk.red(`Error: Failed to parse actor configuration: ${terminalSafeError(err)}`));
             process.exit(1);
         }
     }
