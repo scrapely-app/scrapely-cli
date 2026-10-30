@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.19] - 2026-10-30
+
+- `scrapely mcp` now runs scrapely-mcp 0.3.8 (was 0.3.2): tool errors no longer return exception text, log lines escape control characters, certifi update, plus the search, pricing and docs-tool changes of 0.3.3 to 0.3.8. Run `scrapely mcp install <client>` again to update an existing client entry.
+
 ## [0.1.18] - 2026-10-30
 
 Security release.

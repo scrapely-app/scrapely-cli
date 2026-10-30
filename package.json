@@ -1,6 +1,6 @@
 {
   "name": "scrapely-cli",
-  "version": "0.1.18",
+  "version": "0.1.19",
   "description": "CLI tool for Scrapely - manage actors and runs",
   "main": "dist/index.js",
   "bin": {
