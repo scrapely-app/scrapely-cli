@@ -350,11 +350,11 @@ export function assertSecureApiBaseUrl(url: string): string {
     try {
         parsed = new URL(url);
     } catch {
-        throw new Error(`Invalid Scrapely API URL: ${url}`);
+        throw new Error(`Invalid Scrapely API URL: ${terminalSafeLine(url)}`);
     }
     if (parsed.protocol === 'https:') return url;
     if (parsed.protocol === 'http:' && LOOPBACK_HOSTS.has(parsed.hostname)) return url;
-    throw new Error(`Refusing to use ${url}: the Scrapely API must use https:// (http:// is only allowed for localhost).`);
+    throw new Error(`Refusing to use ${terminalSafeLine(url)}: the Scrapely API must use https:// (http:// is only allowed for localhost).`);
 }
 
 /**

@@ -88,7 +88,7 @@ export async function loginWithBrowser(apiBaseUrl: string, clientName = 'Scrapel
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ client_name: clientName, redirect_uris: [redirectUri] }),
         });
-        console.log(`[oauth] client registered: client_id=${client.client_id} callback=${redirectUri}`);
+        console.log(`[oauth] client registered: client_id=${terminalSafeLine(client.client_id)} callback=${redirectUri}`);
 
         // 4. Open the browser at the authorize endpoint
         const authorizeUrl = new URL(`${base}/v2/oauth/authorize`);

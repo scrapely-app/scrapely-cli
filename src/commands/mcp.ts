@@ -14,12 +14,16 @@ export const MCP_SERVER_NAME = 'scrapely';
 /** The MCP server is the `scrapely-mcp` package on PyPI, run through uv. */
 export const MCP_COMMAND = 'uvx';
 /**
- * scrapely-mcp version the CLI runs. Pinned so a later PyPI release never runs with the user's token unreviewed.
- * Must equal the version in scrapely-mcp-python/pyproject.toml: the CLI tests and the publish workflow fail otherwise,
- * so each MCP release needs a CLI release.
+ * scrapely-mcp versions the CLI runs: the newest release from MCP_MIN_VERSION up to (not including) the next major
+ * version. uvx resolves the range again when the client starts the server, so a new MCP release reaches existing
+ * installs without a CLI release. MCP_MIN_VERSION is the release this CLI version was tested with; the CLI tests and
+ * the publish workflow fail when scrapely-mcp-python/pyproject.toml leaves the range (a new major needs a CLI release
+ * that checks the command and env vars below still work).
  */
-export const MCP_VERSION = '0.3.8';
-export const MCP_ARGS = ['--from', `scrapely-mcp==${MCP_VERSION}`, 'scrapely-mcp-server'];
+export const MCP_MIN_VERSION = '0.3.13';
+export const MCP_MAX_VERSION_EXCLUSIVE = '1';
+export const MCP_REQUIREMENT = `scrapely-mcp>=${MCP_MIN_VERSION},<${MCP_MAX_VERSION_EXCLUSIVE}`;
+export const MCP_ARGS = ['--from', MCP_REQUIREMENT, 'scrapely-mcp-server'];
 
 export const MCP_CLIENTS = ['claude-code', 'claude-desktop', 'cursor', 'vscode', 'codex'] as const;
 export type McpClient = (typeof MCP_CLIENTS)[number];

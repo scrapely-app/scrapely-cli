@@ -373,7 +373,7 @@ venv/
 `);
     }
 
-    console.log(chalk.green(`\n✓ Actor "${actorName}" initialized in ${name ? targetDir : 'current directory'}`));
+    console.log(chalk.green(`\n✓ Actor "${terminalSafeLine(actorName)}" initialized in ${name ? terminalSafeLine(targetDir) : 'current directory'}`));
     if (isScrapyProject) {
         console.log(chalk.gray('  Created: scrapely.json, main.py (Scrapy Actor wrapper), requirements.txt, .gitignore, .actorignore'));
         console.log(chalk.gray('\n  Next steps:'));

@@ -116,7 +116,7 @@ export async function actorsRmCommand(actorId: string, options?: { yes?: boolean
             {
                 type: 'confirm',
                 name: 'confirm',
-                message: `Are you sure you want to delete actor "${actorId}"?`,
+                message: `Are you sure you want to delete actor "${line(actorId)}"?`,
                 default: false,
             },
         ]);
@@ -131,7 +131,7 @@ export async function actorsRmCommand(actorId: string, options?: { yes?: boolean
 
     try {
         await client.actor(actorId).delete();
-        console.log(chalk.green(`✓ Actor ${actorId} deleted successfully`));
+        console.log(chalk.green(`✓ Actor ${line(actorId)} deleted successfully`));
     } catch (err) {
         console.error(chalk.red('Error: Failed to delete actor.'));
         console.error(chalk.gray(`Details: ${line((err as Error).message)}`));
@@ -154,7 +154,7 @@ export async function actorInfoCommand(actorId: string, options?: { input?: bool
         const actor = await client.actor(actorId).get();
 
         if (!actor) {
-            console.error(chalk.red(`Error: Actor "${actorId}" not found.`));
+            console.error(chalk.red(`Error: Actor "${line(actorId)}" not found.`));
             process.exit(1);
         }
 
@@ -189,13 +189,13 @@ export async function actorInfoCommand(actorId: string, options?: { input?: bool
         }
 
         console.log(chalk.bold('Actor Info:'));
-        console.log(`  ID: ${chalk.cyan(actor.id)}`);
+        console.log(`  ID: ${chalk.cyan(line(actor.id))}`);
         console.log(`  Name: ${line(`${actor.username}/${actor.name}`)}`);
         if (actor.title) console.log(`  Title: ${line(actor.title)}`);
         if (actor.description) console.log(`  Description: ${line(actor.description)}`);
         console.log(`  Visibility: ${actor.isPublic ? chalk.green('public') : chalk.yellow('private')}`);
         if (actor.versions && actor.versions.length > 0) {
-            console.log(`  Versions: ${actor.versions.map(v => v.versionNumber).join(', ')}`);
+            console.log(`  Versions: ${actor.versions.map(v => line(v.versionNumber)).join(', ')}`);
         }
     } catch (err) {
         console.error(chalk.red('Error: Failed to get actor info.'));
@@ -263,7 +263,7 @@ export async function actorCallCommand(actorId?: string, options?: {
 
     try {
         if (!silent) {
-            console.log(chalk.gray(`Starting actor ${actorId}...`));
+            console.log(chalk.gray(`Starting actor ${line(actorId)}...`));
         }
 
         const run = await getLoggedClientOrThrow().actor(actorId).start(input, {
@@ -273,7 +273,7 @@ export async function actorCallCommand(actorId?: string, options?: {
         });
 
         if (!silent) {
-            console.log(chalk.green(`✓ Run started: ${run.id}`));
+            console.log(chalk.green(`✓ Run started: ${line(run.id)}`));
         }
 
         // Wait for completion, streaming new log bytes unless --silent/--json.
@@ -307,11 +307,11 @@ export async function actorCallCommand(actorId?: string, options?: {
                     const { items } = await getLoggedClientOrThrow().dataset(finalRun.defaultDatasetId).listItems();
                     console.log(terminalJson(JSON.stringify(items, null, 2)));
                 } catch {
-                    console.log(chalk.gray(`Dataset ID: ${finalRun.defaultDatasetId}`));
+                    console.log(chalk.gray(`Dataset ID: ${line(finalRun.defaultDatasetId)}`));
                 }
             }
         } else {
-            console.log(chalk.red(`✗ Run ${runStatus}`));
+            console.log(chalk.red(`✗ Run ${line(runStatus)}`));
             process.exit(1);
         }
     } catch (err) {
@@ -351,8 +351,8 @@ export async function actorStartCommand(actorId: string | undefined, options?: {
             return;
         }
         
-        console.log(chalk.green(`✓ Run started: ${run.id}`));
-        console.log(chalk.gray(`Status: ${run.status}`));
+        console.log(chalk.green(`✓ Run started: ${line(run.id)}`));
+        console.log(chalk.gray(`Status: ${line(run.status)}`));
     } catch (err) {
         console.error(chalk.red('Error: Failed to start actor.'));
         console.error(chalk.gray(`Details: ${line((err as Error).message)}`));

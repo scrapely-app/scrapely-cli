@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.20] - 2026-11-03
+
+- `scrapely mcp install` writes `uvx --from "scrapely-mcp>=0.3.13,<1" scrapely-mcp-server` instead of one pinned version, so the client runs the newest scrapely-mcp release (0.3.13 today) and later MCP releases need no CLI update. 0.1.19 pinned 0.3.8. Run `scrapely mcp install <client>` again to update an existing client entry.
+
 ## [0.1.19] - 2026-10-30
 
 - `scrapely mcp` now runs scrapely-mcp 0.3.8 (was 0.3.2): tool errors no longer return exception text, log lines escape control characters, certifi update, plus the search, pricing and docs-tool changes of 0.3.3 to 0.3.8. Run `scrapely mcp install <client>` again to update an existing client entry.
