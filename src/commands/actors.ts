@@ -12,6 +12,7 @@ import { pushCommand } from './push.js';
 import { buildCreateCommand } from './builds.js';
 import { resolveRemoteInput } from '../utils/inputResolution.js';
 import { terminalSafeLine as line, terminalSafeText, stdoutSafeText, terminalJson } from '../utils/terminal.js';
+import { creditUnlockLine, heldRunLine } from '../utils/creditUnlock.js';
 
 /**
  * actors ls - List actors
@@ -299,6 +300,10 @@ export async function actorCallCommand(actorId?: string, options?: {
             return;
         }
         
+        // Results held because the free credit ran out: the count and the unlock link.
+        const held = heldRunLine(finalRun);
+        if (held) console.log(chalk.yellow(held));
+
         if (runStatus === 'SUCCEEDED') {
             console.log(chalk.green(`✓ Run completed successfully`));
             
@@ -317,6 +322,8 @@ export async function actorCallCommand(actorId?: string, options?: {
     } catch (err) {
         console.error(chalk.red('Error: Failed to run actor.'));
         console.error(chalk.gray(`Details: ${line((err as Error).message)}`));
+        const unlock = creditUnlockLine(err);
+        if (unlock) console.error(chalk.yellow(unlock));
         process.exit(1);
     }
 }

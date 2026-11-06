@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.21] - 2026-11-06
+
+- Out of credit: when the API refuses a request for the account balance (HTTP 402), the error output adds the link from the API on its own line: `Unlock: <url>` (a Free account: the Starter checkout, or the unlock of its held run) or `Add credit: <url>` (a paid account). `scrapely api` prints the API's text and that line on stderr; stdout keeps the response body.
+- `scrapely actors call`: a run whose results are held because the free credit ran out prints how many are held, until when, and the unlock link.
+
 ## [0.1.20] - 2026-11-03
 
 - `scrapely mcp install` writes `uvx --from "scrapely-mcp>=0.3.13,<1" scrapely-mcp-server` instead of one pinned version, so the client runs the newest scrapely-mcp release (0.3.13 today) and later MCP releases need no CLI update. 0.1.19 pinned 0.3.8. Run `scrapely mcp install <client>` again to update an existing client entry.

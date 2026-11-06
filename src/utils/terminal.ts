@@ -5,6 +5,8 @@
  * emit hyperlinks, so they are removed before printing.
  */
 
+import { creditUnlockLine } from './creditUnlock.js';
+
 // C0 controls except tab and newline, DEL, and C1 controls (incl. 8-bit CSI).
 // eslint-disable-next-line no-control-regex
 const CONTROL_CHARS = /[\u0000-\u0008\u000b-\u001f\u007f-\u009f]/g;
@@ -19,9 +21,11 @@ export function terminalSafeLine(value: unknown): string {
     return terminalSafeText(value).replace(/[\n\t]/g, ' ');
 }
 
-/** Error messages (often from the API) printed to the terminal. */
+/** Error messages (often from the API) printed to the terminal; a 402 for the balance adds its unlock / top-up link. */
 export function terminalSafeError(err: unknown): string {
-    return terminalSafeText(err instanceof Error ? err.message : err);
+    const text = terminalSafeText(err instanceof Error ? err.message : err);
+    const unlock = creditUnlockLine(err);
+    return unlock ? `${text}\n${unlock}` : text;
 }
 
 /**

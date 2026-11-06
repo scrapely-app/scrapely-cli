@@ -7,6 +7,7 @@ import { Command } from 'commander';
 import { getApiBaseUrl } from '../config.js';
 import { getLoggedClientOrThrow } from '../client.js';
 import { stdoutSafeText, terminalJson, terminalSafeError } from '../utils/terminal.js';
+import { creditUnlockLine } from '../utils/creditUnlock.js';
 
 /**
  * API endpoint definitions for help — derived from scrapely-server route files.
@@ -492,6 +493,12 @@ export async function apiCommand(
         const apiError = err as { statusCode?: number; data?: unknown; message?: string };
         if (apiError.statusCode) {
             const data = apiError.data;
+            // Out of credit: the API's text and its unlock / top-up link on stderr (stdout keeps the body).
+            const unlock = creditUnlockLine(err);
+            if (unlock) {
+                if (apiError.message) console.error(chalk.yellow(stdoutSafeText(apiError.message)));
+                console.error(chalk.yellow(unlock));
+            }
             if (data !== undefined && data !== '') {
                 console.log(typeof data === 'string' ? stdoutSafeText(data) : terminalJson(JSON.stringify(data, null, 2)));
             } else if (apiError.message) {
